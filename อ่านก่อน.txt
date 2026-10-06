@@ -1,0 +1,73 @@
+เช็คลิสต์ก่อนใช้งานโค้ด — ระบบยืมคืนทรัพย์สินบริษัท (project-web)
+=====================================================
+
+[1] โปรแกรมที่ต้องติดตั้งในเครื่องก่อน
+--------------------------------------
+[ ] Node.js (เวอร์ชัน 18 ขึ้นไป) — เช็คด้วยคำสั่ง: node -v
+[ ] npm (ติดมากับ Node.js อยู่แล้ว) — เช็คด้วยคำสั่ง: npm -v
+[ ] MySQL Server (หรือ XAMPP/MAMP ที่มี MySQL) — ต้องรันอยู่ก่อนเริ่มใช้งาน
+[ ] เครื่องมือดู/แก้ฐานข้อมูล เช่น MySQL Workbench, phpMyAdmin, DBeaver (เลือกอย่างใดอย่างหนึ่ง)
+[ ] Git — เช็คด้วยคำสั่ง: git -v
+[ ] Postman (สำหรับทดสอบ API/JWT ตามที่โจทย์กำหนด)
+
+[2] เตรียมฐานข้อมูล
+--------------------------------------
+[ ] เปิด MySQL ให้รันอยู่
+[ ] เปิดไฟล์ backend/sql/schema.sql แล้วรันทั้งไฟล์ใน MySQL
+    (จะสร้างฐานข้อมูล assetdb พร้อมตารางและข้อมูลตัวอย่าง)
+[ ] จดรหัสผ่าน MySQL ของ user root (หรือ user ที่จะใช้เชื่อมต่อ) ไว้ให้แม่นยำ
+
+[3] ตั้งค่า Backend
+--------------------------------------
+[ ] เปิด terminal แล้ว cd เข้าโฟลเดอร์ backend
+[ ] รันคำสั่ง: npm install
+[ ] คัดลอกไฟล์ .env.example เป็น .env
+[ ] เปิดไฟล์ .env แก้ค่าต่อไปนี้ให้ตรงกับเครื่องตัวเอง:
+      DB_HOST=localhost
+      DB_USER=root
+      DB_PASSWORD=<รหัสผ่าน MySQL ที่ตั้งไว้จริง>
+      DB_NAME=assetdb
+      JWT_SECRET=<ตั้งข้อความยาวๆ อะไรก็ได้ อย่าปล่อยว่าง>
+[ ] สร้างบัญชี admin คนแรกด้วยคำสั่ง:
+      node utils/createAdmin.js admin admin@example.com "Admin@1234"
+    (ต้องขึ้นข้อความ "Admin account ready: admin" ถือว่าสำเร็จ)
+[ ] รันเซิร์ฟเวอร์: npm run dev  (หรือ npm start)
+[ ] เช็คว่าขึ้นข้อความ "Asset system API running on http://localhost:4100"
+
+[4] ตั้งค่า Frontend
+--------------------------------------
+[ ] เปิด terminal ใหม่อีกอัน (เปิดคู่กับ backend ห้ามปิด terminal เดิม)
+[ ] cd เข้าโฟลเดอร์ frontend
+[ ] รันคำสั่ง: npm install
+[ ] ถ้าใช้ create-vue สร้างโปรเจกต์เอง ให้เช็คว่าลง axios แล้ว: npm install axios
+[ ] เปิดไฟล์ vite.config.js เช็คว่ามีส่วน proxy ชี้ไปที่ backend หรือยัง:
+      server: { proxy: { '/api': 'http://localhost:4100' } }
+[ ] รัน: npm run dev
+[ ] เปิดเบราว์เซอร์ไปที่ URL ที่ terminal แจ้ง (เช่น http://localhost:5180)
+
+[5] ทดสอบว่าใช้งานได้จริง
+--------------------------------------
+[ ] เข้าหน้าเว็บ ต้องเจอหน้า Login
+[ ] Login ด้วย username: admin / password: Admin@1234 (หรือรหัสที่ตั้งเอง)
+[ ] เข้าเมนู "จัดการพนักงาน" ลองเพิ่มพนักงานใหม่ 1 คน (role: employee)
+[ ] เข้าเมนู "จัดการทรัพย์สิน" เช็คว่ามีรายการทรัพย์สินตัวอย่างขึ้นมา
+[ ] ล็อกเอาท์แล้ว login ด้วยบัญชีพนักงานที่เพิ่งสร้าง ลองยื่นคำขอยืมทรัพย์สิน
+[ ] login กลับด้วย admin ลองอนุมัติคำขอ แล้วลองบันทึกการคืนดู
+
+[6] ก่อน push ขึ้น GitHub
+--------------------------------------
+[ ] สร้างไฟล์ .gitignore ที่ root ของโปรเจกต์ ใส่:
+      node_modules/
+      .env
+      dist/
+      *.log
+[ ] เช็คด้วย git status ว่าไฟล์ .env ไม่ติดไปด้วย ก่อน commit ทุกครั้ง
+[ ] git init (ถ้ายังไม่เคยทำ)
+[ ] git remote add origin https://github.com/Tanawit-code/Project_web_JanTom.git
+[ ] git add .
+[ ] git commit -m "ข้อความอธิบายงานที่ทำ"
+[ ] git branch -M main
+[ ] git push -u origin main
+
+หมายเหตุ: backend กับ frontend ต้องรันพร้อมกันตลอดเวลาที่ใช้งานเว็บ ถ้าปิด terminal
+ฝั่งใดฝั่งหนึ่ง เว็บจะเรียก API ไม่ได้หรือขึ้นหน้าขาว
