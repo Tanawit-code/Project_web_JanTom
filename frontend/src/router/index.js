@@ -9,6 +9,7 @@ import Approvals from '../views/Approvals.vue';
 import AdminAssets from '../views/admin/AdminAssets.vue';
 import AdminReturns from '../views/admin/AdminReturns.vue';
 import AdminEmployees from '../views/admin/AdminEmployees.vue';
+import Contact from '../views/Contact.vue';
 
 const routes = [
   { path: '/login', component: Login },
@@ -19,6 +20,7 @@ const routes = [
   { path: '/admin/assets', component: AdminAssets, meta: { requiresRole: ['admin'] } },
   { path: '/admin/returns', component: AdminReturns, meta: { requiresRole: ['admin', 'approver'] } },
   { path: '/admin/employees', component: AdminEmployees, meta: { requiresRole: ['admin'] } },
+  { path: '/contact', component: Contact, meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });

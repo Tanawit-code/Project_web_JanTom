@@ -8,9 +8,9 @@ function logout() { clearSession(); router.push('/login'); }
 
 <template>
   <header style="background:var(--primary); color:#fff;">
-    <nav class="container" style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; flex-wrap:wrap; gap:10px;">
-      <router-link to="/" style="font-weight:bold; font-size:18px; color:#fff;">ระบบยืมคืนทรัพย์สินบริษัท</router-link>
-      <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+    <nav style="display:flex; align-items:center; justify-content:space-between; width:100%; box-sizing:border-box; padding:14px 24px; flex-wrap:wrap; gap:10px;">
+      <router-link to="/" style="font-weight:bold; font-size:18px; color:#fff; flex-shrink:0;">ระบบยืมคืนทรัพย์สินบริษัท</router-link>
+      <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
         <template v-if="authState.user">
           <router-link to="/assets" style="color:#fff;">ทรัพย์สิน</router-link>
           <router-link to="/my-borrows" style="color:#fff;">คำขอของฉัน</router-link>
@@ -18,6 +18,7 @@ function logout() { clearSession(); router.push('/login'); }
           <router-link v-if="hasRole('admin','approver')" to="/admin/returns" style="color:#fff;">รับคืน</router-link>
           <router-link v-if="hasRole('admin')" to="/admin/assets" style="color:#fff;">จัดการทรัพย์สิน</router-link>
           <router-link v-if="hasRole('admin')" to="/admin/employees" style="color:#fff;">จัดการพนักงาน</router-link>
+          <router-link to="/contact" style="color:#fff;">ติดต่อเรา</router-link>
           <span style="color:#dbe4f5;">{{ authState.user.first_name }} ({{ authState.user.role }})</span>
           <button class="btn secondary" @click="logout">ออกจากระบบ</button>
         </template>

@@ -49,12 +49,19 @@ onMounted(load);
 
     <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:16px; margin-bottom:24px;">
       <label v-for="a in assets" :key="a.asset_id" class="card"
-             :style="{ cursor:'pointer', border: selectedIds.includes(a.asset_id) ? '2px solid var(--primary)' : '2px solid transparent' }">
-        <input type="checkbox" :checked="selectedIds.includes(a.asset_id)" @change="toggle(a.asset_id)" style="width:auto; margin-bottom:8px;" />
-        <h3 style="margin:0 0 4px;">{{ a.asset_name }}</h3>
-        <p style="font-size:13px; color:var(--muted); margin:0 0 4px;">{{ a.asset_code }} · {{ a.cat_name }}</p>
-        <p style="font-size:13px; color:var(--muted);">ที่เก็บ: {{ a.location }}</p>
-        <span class="badge available">ว่าง</span>
+             :style="{ cursor:'pointer', padding:0, overflow:'hidden', border: selectedIds.includes(a.asset_id) ? '2px solid var(--primary)' : '2px solid transparent' }">
+        <img v-if="a.image_url" :src="a.image_url" :alt="a.asset_name"
+             style="width:100%; height:140px; object-fit:cover; display:block;" />
+        <div v-else style="width:100%; height:140px; background:#e5e9f0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px;">
+          ไม่มีรูปภาพ
+        </div>
+        <div style="padding:16px;">
+          <input type="checkbox" :checked="selectedIds.includes(a.asset_id)" @change="toggle(a.asset_id)" style="width:auto; margin-bottom:8px;" />
+          <h3 style="margin:0 0 4px;">{{ a.asset_name }}</h3>
+          <p style="font-size:13px; color:var(--muted); margin:0 0 4px;">{{ a.asset_code }} · {{ a.cat_name }}</p>
+          <p style="font-size:13px; color:var(--muted);">ที่เก็บ: {{ a.location }}</p>
+          <span class="badge available">ว่าง</span>
+        </div>
       </label>
     </div>
     <p v-if="assets.length === 0" style="color:var(--muted);">ไม่พบทรัพย์สินที่ว่าง</p>

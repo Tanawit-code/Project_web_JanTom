@@ -4,3 +4,5 @@ backend/.env
 frontend/.env
 dist
 build
+backend/uploads/*
+!backend/uploads/.gitkeep

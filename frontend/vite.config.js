@@ -5,6 +5,9 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 5180,
-    proxy: { '/api': 'http://localhost:4100' },
+    proxy: {
+      '/api': 'http://localhost:4100',
+      '/uploads': 'http://localhost:4100',
+    },
   },
 });

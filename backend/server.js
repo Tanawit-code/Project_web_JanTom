@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
@@ -13,6 +14,9 @@ const returnRoutes = require('./routes/returns');
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// serve uploaded asset images, e.g. http://localhost:4100/uploads/xxxx.jpg
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

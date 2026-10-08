@@ -64,4 +64,73 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   }
 });
 
+router.get('/my-role', requireAuth, async (req, res) => {
+  try {
+    const role = req.user.role;
+
+    const [rows] = await pool.query(
+      `SELECT emp_id, emp_code, first_name, last_name, position, role
+       FROM EMPLOYEE
+       WHERE role = ?
+       ORDER BY emp_id DESC`,
+      [role]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// ดูเฉพาะ Admin
+router.get('/admins', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT emp_id, emp_code, first_name, last_name, position, phone, email, role, dept_id
+       FROM EMPLOYEE
+       WHERE role = 'admin'
+       ORDER BY emp_id DESC`
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// ดูเฉพาะ Approver
+router.get('/approvers', requireAuth, requireRole('approver'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT emp_id, emp_code, first_name, last_name, position, phone, email, role, dept_id
+       FROM EMPLOYEE
+       WHERE role = 'approver'
+       ORDER BY emp_id DESC`
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// ดูเฉพาะ Employee
+router.get('/employees', requireAuth, requireRole('employee'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT emp_id, emp_code, first_name, last_name, position, phone, email, role, dept_id
+       FROM EMPLOYEE
+       WHERE role = 'employee'
+       ORDER BY emp_id DESC`
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
 module.exports = router;

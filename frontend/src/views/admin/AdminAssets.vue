@@ -6,9 +6,12 @@ const assets = ref([]);
 const categories = ref([]);
 const search = ref('');
 const error = ref(''); const success = ref('');
-const emptyForm = { asset_id: null, asset_code: '', asset_name: '', brand: '', model: '', serial_number: '', purchase_date: '', price: '', status: 'available', location: '', cat_id: '' };
+const emptyForm = { asset_id: null, asset_code: '', asset_name: '', brand: '', model: '', serial_number: '', purchase_date: '', price: '', status: 'available', location: '', cat_id: '', image_url: '' };
 const form = ref({ ...emptyForm });
 const isEditing = ref(false);
+const imageFile = ref(null);
+const imagePreview = ref('');
+const uploading = ref(false);
 
 async function loadAssets() {
   const { data } = await api.get('/assets', { params: { q: search.value || undefined } });
@@ -18,17 +21,51 @@ async function loadCategories() {
   const { data } = await api.get('/categories');
   categories.value = data;
 }
-function startEdit(a) { form.value = { ...a, purchase_date: a.purchase_date?.slice(0,10) }; isEditing.value = true; }
-function resetForm() { form.value = { ...emptyForm }; isEditing.value = false; }
+function startEdit(a) {
+  form.value = { ...a, purchase_date: a.purchase_date?.slice(0,10) };
+  isEditing.value = true;
+  imageFile.value = null;
+  imagePreview.value = a.image_url || '';
+}
+function resetForm() {
+  form.value = { ...emptyForm };
+  isEditing.value = false;
+  imageFile.value = null;
+  imagePreview.value = '';
+}
+
+function onFileChange(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  imageFile.value = file;
+  imagePreview.value = URL.createObjectURL(file);
+}
+
+async function uploadImageIfNeeded() {
+  if (!imageFile.value) return form.value.image_url || '';
+  uploading.value = true;
+  try {
+    const fd = new FormData();
+    fd.append('image', imageFile.value);
+    const { data } = await api.post('/assets/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data.image_url;
+  } finally {
+    uploading.value = false;
+  }
+}
 
 async function submit() {
   error.value = ''; success.value = '';
   try {
+    const image_url = await uploadImageIfNeeded();
+    const payload = { ...form.value, image_url };
     if (isEditing.value) {
-      await api.put(`/assets/${form.value.asset_id}`, form.value);
+      await api.put(`/assets/${form.value.asset_id}`, payload);
       success.value = 'แก้ไขทรัพย์สินสำเร็จ';
     } else {
-      await api.post('/assets', form.value);
+      await api.post('/assets', payload);
       success.value = 'เพิ่มทรัพย์สินสำเร็จ';
     }
     resetForm(); loadAssets();
@@ -70,8 +107,20 @@ onMounted(() => { loadAssets(); loadCategories(); });
           <option value="repair">ส่งซ่อม</option>
           <option value="retired">จำหน่ายออก</option>
         </select>
+
+        <div style="grid-column:1/3; margin-bottom:12px;">
+          <label style="font-size:13px; color:var(--muted); display:block; margin-bottom:6px;">รูปภาพทรัพย์สิน</label>
+          <input type="file" accept="image/png, image/jpeg, image/webp, image/gif" @change="onFileChange" style="margin-bottom:10px;" />
+          <div v-if="imagePreview" style="display:flex; align-items:center; gap:12px;">
+            <img :src="imagePreview" alt="preview" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #d7dae0;" />
+            <span style="font-size:13px; color:var(--muted);">{{ uploading ? 'กำลังอัปโหลด...' : 'ตัวอย่างรูปภาพ' }}</span>
+          </div>
+        </div>
+
         <div style="grid-column:1/3; display:flex; gap:10px;">
-          <button class="btn" type="submit">{{ isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มทรัพย์สิน' }}</button>
+          <button class="btn" type="submit" :disabled="uploading">
+            {{ uploading ? 'กำลังอัปโหลดรูป...' : (isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มทรัพย์สิน') }}
+          </button>
           <button v-if="isEditing" class="btn secondary" type="button" @click="resetForm">ยกเลิก</button>
         </div>
       </form>
@@ -84,9 +133,14 @@ onMounted(() => { loadAssets(); loadCategories(); });
 
     <div class="card">
       <table>
-        <thead><tr><th>รหัส</th><th>ชื่อ</th><th>ประเภท</th><th>สถานะ</th><th></th></tr></thead>
+        <thead><tr><th></th><th>รหัส</th><th>ชื่อ</th><th>ประเภท</th><th>สถานะ</th><th></th></tr></thead>
         <tbody>
           <tr v-for="a in assets" :key="a.asset_id">
+            <td>
+              <img v-if="a.image_url" :src="a.image_url" :alt="a.asset_name"
+                   style="width:48px; height:48px; object-fit:cover; border-radius:6px;" />
+              <div v-else style="width:48px; height:48px; border-radius:6px; background:#e5e9f0;"></div>
+            </td>
             <td>{{ a.asset_code }}</td>
             <td>{{ a.asset_name }}</td>
             <td>{{ a.cat_name }}</td>
