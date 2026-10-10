@@ -8,6 +8,8 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
+  // คอลัมน์ DATE ส่งเป็นสตริง 'YYYY-MM-DD' กันวันที่เลื่อนไป 1 วันเพราะ time zone
+  dateStrings: ['DATE'],
 });
 
 module.exports = pool;

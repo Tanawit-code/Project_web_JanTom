@@ -3,6 +3,10 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { bangkokToday, isValidCeDate } = require('../utils/dates');
+
+const BAD_PURCHASE_DATE = 'วันที่ซื้อไม่ถูกต้อง (ต้องเป็นปี ค.ศ. และไม่เกินวันนี้ เช่น 2025-06-10)';
+const badPurchaseDate = (d) => d && (!isValidCeDate(d) || d.slice(0, 10) > bangkokToday());
 
 // All logged-in roles can browse assets (to request a borrow)
 router.get('/', requireAuth, async (req, res) => {
@@ -37,6 +41,7 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const { asset_code, asset_name, brand, model, serial_number, purchase_date, price, location, cat_id, image_url } = req.body;
     if (!asset_code || !asset_name) return res.status(400).json({ message: 'กรุณากรอกรหัสและชื่อทรัพย์สิน' });
+    if (badPurchaseDate(purchase_date)) return res.status(400).json({ message: BAD_PURCHASE_DATE });
     const [result] = await pool.query(
       `INSERT INTO ASSET (asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url)
        VALUES (?,?,?,?,?,?,?, 'available', ?, ?, ?)`,
@@ -53,6 +58,7 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
 
 router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const { asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url } = req.body;
+  if (badPurchaseDate(purchase_date)) return res.status(400).json({ message: BAD_PURCHASE_DATE });
   const [result] = await pool.query(
     `UPDATE ASSET SET asset_name=?, brand=?, model=?, serial_number=?, purchase_date=?, price=?, status=?, location=?, cat_id=?, image_url=?
      WHERE asset_id=?`,

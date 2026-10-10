@@ -56,8 +56,15 @@ async function uploadImageIfNeeded() {
   }
 }
 
+const todayStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+
 async function submit() {
   error.value = ''; success.value = '';
+  const pd = form.value.purchase_date;
+  if (pd && (pd < '1990-01-01' || pd > todayStr)) {
+    error.value = 'วันที่ซื้อไม่ถูกต้อง ต้องเป็นปี ค.ศ. และไม่เกินวันนี้ (เช่น 2025-06-10) ตรวจสอบว่าไม่ได้ใส่ปี พ.ศ.';
+    return;
+  }
   try {
     const image_url = await uploadImageIfNeeded();
     const payload = { ...form.value, image_url };
@@ -94,7 +101,7 @@ onMounted(() => { loadAssets(); loadCategories(); });
         <input v-model="form.brand" placeholder="ยี่ห้อ" />
         <input v-model="form.model" placeholder="รุ่น" />
         <input v-model="form.serial_number" placeholder="Serial Number" />
-        <input v-model="form.purchase_date" type="date" />
+        <input v-model="form.purchase_date" type="date" min="1990-01-01" :max="todayStr" />
         <input v-model="form.price" type="number" step="0.01" placeholder="ราคา" />
         <input v-model="form.location" placeholder="สถานที่จัดเก็บ" />
         <select v-model="form.cat_id">

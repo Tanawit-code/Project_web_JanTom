@@ -1,8 +1,52 @@
-node_modules
+# ===== Dependencies =====
+node_modules/
+
+# ===== Environment / secrets (ห้าม commit เด็ดขาด) =====
 .env
-backend/.env
-frontend/.env
-dist
-build
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ===== ไฟล์ที่ผู้ใช้อัปโหลด =====
+# รูปทรัพย์สิน (ไฟล์ตัวอย่างที่ DB อ้างถึงถูก add -f ไว้แล้ว ดู README)
 backend/uploads/*
 !backend/uploads/.gitkeep
+# สลิปการโอนเงินค่าปรับ (ข้อมูลส่วนบุคคล ห้ามขึ้น GitHub)
+backend/private_uploads/*
+!backend/private_uploads/.gitkeep
+
+# ===== Build output =====
+dist/
+dist-ssr/
+build/
+coverage/
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== ไฟล์ชั่วคราว / ไฟล์ส่วนตัวของ OS และ Editor =====
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.suo
+*.tsbuildinfo
+.eslintcache
+
+# ===== ไฟล์สำรองฐานข้อมูลที่ไม่ได้ตั้งใจแชร์ =====
+# (ไฟล์ SQL ของโปรเจกต์อยู่ใน backend/sql/ และต้อง commit)
+*.sql.bak
+*.dump
+backend/sql/*.local.sql
+
+# ===== ไฟล์โน้ตส่วนตัว (เคยมีรหัสผ่านเขียนไว้) =====
+read Me.txt

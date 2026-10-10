@@ -8,13 +8,13 @@ const { validatePasswordStrength } = require('../utils/password');
 // Admin/approver need this list for dropdowns (approver selection), so allow both to read
 router.get('/', requireAuth, requireRole('admin', 'approver'), async (req, res) => {
   const [rows] = await pool.query(
-    `SELECT emp_id, emp_code, first_name, last_name, position, phone, email, role, dept_id
+    `SELECT emp_id, emp_code, first_name, last_name, position, phone, email, role, status, dept_id
      FROM EMPLOYEE ORDER BY emp_id DESC`
   );
   res.json(rows);
 });
 
-// Admin creates employee accounts (no public self-registration in this system)
+// Admin creates employee accounts directly (status = active). Self-registration lives in routes/auth.js
 router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const { emp_code, first_name, last_name, position, phone, email, username, password, role, dept_id } = req.body;

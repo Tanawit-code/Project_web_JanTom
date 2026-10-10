@@ -10,6 +10,9 @@ const categoryRoutes = require('./routes/categories');
 const assetRoutes = require('./routes/assets');
 const borrowRoutes = require('./routes/borrowRequests');
 const returnRoutes = require('./routes/returns');
+const fineRoutes = require('./routes/fines');
+const notificationRoutes = require('./routes/notifications');
+const dashboardRoutes = require('./routes/dashboard');
 
 const app = express();
 app.use(cors());
@@ -27,6 +30,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/borrow-requests', borrowRoutes);
 app.use('/api/returns', returnRoutes);
+app.use('/api/fines', fineRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 const PORT = process.env.PORT || 4100;
 app.listen(PORT, () => console.log(`Asset system API running on http://localhost:${PORT}`));

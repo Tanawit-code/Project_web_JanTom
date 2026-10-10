@@ -1,38 +1,23 @@
-# frontend
+# Frontend — ระบบยืมคืนทรัพย์สินบริษัท
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3 + Vite + Vue Router + Axios
 
-## Recommended IDE Setup
+วิธีติดตั้งและรันทั้งระบบ (backend + frontend + ฐานข้อมูล) อยู่ที่ [README หลักของโปรเจกต์](../README.md)
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
 npm install
+npm run dev      # http://localhost:5180 (proxy /api และ /uploads ไปที่ backend พอร์ต 4100)
+npm run build    # สร้างไฟล์สำหรับ deploy ในโฟลเดอร์ dist/
 ```
 
-### Compile and Hot-Reload for Development
+โครงสร้างหลักใน `src/`
 
-```sh
-npm run dev
-```
+| โฟลเดอร์ | หน้าที่ |
+|---|---|
+| `views/` | หน้าเว็บ (หน้าของ admin อยู่ใน `views/admin/`) |
+| `components/` | NavBar, กระดิ่งแจ้งเตือน, ฟอร์มช่องกรอก ฯลฯ |
+| `router/index.js` | เส้นทางและการตรวจสิทธิ์ตาม role |
+| `services/api.js` | axios (แนบ JWT อัตโนมัติ) |
+| `services/auth.js` | เก็บ session ผู้ใช้ |
 
-### Compile and Minify for Production
-
-```sh
-npm run build
-```
+หมายเหตุ: ไฟล์ `HelloWorld.vue`, `TheWelcome.vue`, `HomeView.vue`, `AboutView.vue` ฯลฯ เป็นของเทมเพลตเริ่มต้นของ Vue ไม่ได้ใช้งานในระบบ ลบทิ้งได้

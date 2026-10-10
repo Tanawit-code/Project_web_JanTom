@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { bangkokToday, bangkokDatePlusDays, isValidCeDate } = require('../utils/dates');
 
 function genBorrowCode() {
   const d = new Date();
@@ -12,9 +13,15 @@ function genBorrowCode() {
 router.post('/', requireAuth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
-    const { due_date, purpose, asset_ids } = req.body;
-    if (!due_date || !Array.isArray(asset_ids) || asset_ids.length === 0) {
-      return res.status(400).json({ message: 'กรุณาระบุวันครบกำหนดและเลือกทรัพย์สินอย่างน้อย 1 รายการ' });
+    const { due_date, days, purpose, asset_ids } = req.body;
+    // วันที่ยืม = เวลาที่ส่งคำขอ (request_date ตั้งอัตโนมัติ) ส่วนวันคืน = วันนี้ + จำนวนวันที่เลือก
+    const nDays = Number.parseInt(days, 10);
+    const useDays = Number.isInteger(nDays) && nDays >= 1 && nDays <= 30;
+    if ((!useDays && !due_date) || !Array.isArray(asset_ids) || asset_ids.length === 0) {
+      return res.status(400).json({ message: 'กรุณาเลือกระยะเวลายืมและเลือกทรัพย์สินอย่างน้อย 1 รายการ' });
+    }
+    if (!useDays && (!isValidCeDate(due_date) || due_date.slice(0, 10) < bangkokToday())) {
+      return res.status(400).json({ message: 'วันครบกำหนดคืนไม่ถูกต้อง (ต้องเป็นปี ค.ศ. และไม่ย้อนหลัง)' });
     }
 
     await conn.beginTransaction();
@@ -30,9 +37,11 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const borrow_code = genBorrowCode();
+    // คำนวณวันคืนเป็นเวลาไทยฝั่ง Node (ไม่พึ่ง time zone ของ MySQL)
+    const finalDue = useDays ? bangkokDatePlusDays(nDays) : due_date.slice(0, 10);
     const [reqResult] = await conn.query(
       `INSERT INTO BORROW_REQUEST (borrow_code, due_date, purpose, status, emp_id) VALUES (?,?,?, 'pending', ?)`,
-      [borrow_code, due_date, purpose || null, req.user.emp_id]
+      [borrow_code, finalDue, purpose || null, req.user.emp_id]
     );
     const borrow_id = reqResult.insertId;
 
