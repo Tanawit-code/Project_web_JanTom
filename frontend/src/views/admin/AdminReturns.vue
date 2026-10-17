@@ -26,7 +26,10 @@ function onTypeChange(it) {
   const f = forms.value[it.detail_id];
   if (f.fine_type === 'none') { f.fine_amount = ''; f.fine_reason = ''; }
   else if (f.fine_type === 'late' && it.days_late > 0) { f.fine_amount = it.suggested_late_fine; f.fine_reason = `ส่งคืนล่าช้า ${it.days_late} วัน`; }
-  else if (f.fine_type === 'damaged' && !f.fine_reason) f.fine_reason = 'ทรัพย์สินชำรุด/เสียหาย';
+  else if (f.fine_type === 'damaged') {
+    f.fine_amount = '';
+    if (!f.fine_reason) f.fine_reason = 'ทรัพย์สินชำรุด/เสียหาย';
+  }
 }
 
 async function submitReturn(item) {
@@ -76,15 +79,16 @@ onMounted(load);
         <input v-model="forms[item.detail_id].condition_in" placeholder="สภาพตอนคืน เช่น ปกติ / หน้าจอร้าว" />
         <select v-model="forms[item.detail_id].fine_type" @change="onTypeChange(item)">
           <option value="none">ไม่มีค่าปรับ</option>
-          <option value="late">ค่าปรับส่งคืนล่าช้า</option>
+          <option value="late" :disabled="item.days_late <= 0">ค่าปรับส่งคืนล่าช้า</option>
           <option value="damaged">ค่าปรับชำรุด/เสียหาย</option>
           <option value="other">ค่าปรับอื่น ๆ</option>
         </select>
         <template v-if="forms[item.detail_id].fine_type !== 'none'">
-          <input v-model="forms[item.detail_id].fine_amount" type="number" min="1" step="0.01" placeholder="จำนวนเงิน (บาท)" />
+          <input v-model="forms[item.detail_id].fine_amount" type="number" min="1" step="0.01" placeholder="จำนวนเงิน (บาท)"
+            :readonly="forms[item.detail_id].fine_type === 'late' && item.days_late > 0" />
           <input v-model="forms[item.detail_id].fine_reason" placeholder="เหตุผล/รายละเอียดค่าปรับ" maxlength="255" />
           <p v-if="forms[item.detail_id].fine_type === 'late' && item.days_late > 0" class="hint">
-            คำนวณจากวันละ ฿{{ money(item.fine_per_day) }} × {{ item.days_late }} วัน (แก้ตัวเลขได้)
+            ระบบคำนวณอัตโนมัติ: วันละ ฿{{ money(item.fine_per_day) }} × {{ item.days_late }} วัน
           </p>
         </template>
         <button class="btn" :disabled="busyId === item.detail_id" @click="submitReturn(item)">

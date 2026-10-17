@@ -3,10 +3,9 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { bangkokToday } = require('../utils/dates');
-const { FINE_TYPES, TYPE_LABEL, createFine, emailFineCreated } = require('../utils/fines');
+const { FINE_TYPES, TYPE_LABEL, FINE_PER_DAY, calculateLateFine, createFine, emailFineCreated } = require('../utils/fines');
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : '');
-const FINE_PER_DAY = Number(process.env.FINE_PER_DAY) > 0 ? Number(process.env.FINE_PER_DAY) : 100;
 
 // List items currently borrowed and not yet returned (for admin to process a return)
 // เพิ่ม days_late / suggested_late_fine ให้ admin ใช้เป็นค่าเริ่มต้นของค่าปรับ
@@ -41,21 +40,33 @@ router.get('/pending', requireAuth, requireRole('admin', 'approver'), async (req
 // ถ้ามีค่าปรับ (ส่งล่าช้า/ชำรุด) จะสร้างรายการค่าปรับ + แจ้งเตือนพนักงานให้ชำระ
 router.post('/', requireAuth, requireRole('admin', 'approver'), async (req, res) => {
   const conn = await pool.getConnection();
-  let fine = null;
-  let fineInfo = null;
+  const fineInfos = [];
   try {
     const { detail_id, condition_in, fine_amount, fine_type, fine_reason } = req.body;
     if (!detail_id) return res.status(400).json({ message: 'กรุณาระบุรายการที่จะคืน' });
-    const fineAmt = Math.round((Number(fine_amount) || 0) * 100) / 100;
-    if (fineAmt < 0 || fineAmt > 1000000) return res.status(400).json({ message: 'จำนวนค่าปรับไม่ถูกต้อง' });
+    const enteredFineAmt = Math.round((Number(fine_amount) || 0) * 100) / 100;
 
     await conn.beginTransaction();
 
     const [[detail]] = await conn.query(
-      `SELECT bd.*, br.borrow_id, br.emp_id FROM BORROW_DETAIL bd JOIN BORROW_REQUEST br ON br.borrow_id = bd.borrow_id WHERE bd.detail_id = ?`,
-      [detail_id]
+      `SELECT bd.*, br.borrow_id, br.emp_id, br.due_date,
+              GREATEST(DATEDIFF(?, br.due_date), 0) AS days_late
+       FROM BORROW_DETAIL bd JOIN BORROW_REQUEST br ON br.borrow_id = bd.borrow_id
+       WHERE bd.detail_id = ?`,
+      [bangkokToday(), detail_id]
     );
     if (!detail) { await conn.rollback(); return res.status(404).json({ message: 'ไม่พบรายการยืม' }); }
+
+    // Late fees are always calculated by the server; the submitted amount is only for damage/other fees.
+    const daysLate = Math.max(0, Number(detail.days_late) || 0);
+    const isLate = daysLate > 0;
+    const lateFineAmt = isLate ? calculateLateFine(daysLate) : 0;
+    const extraFineAmt = ['damaged', 'other'].includes(fine_type) ? enteredFineAmt : 0;
+    const fineAmt = lateFineAmt + extraFineAmt;
+    if (enteredFineAmt < 0 || fineAmt > 1000000) {
+      await conn.rollback();
+      return res.status(400).json({ message: 'จำนวนค่าปรับไม่ถูกต้อง' });
+    }
 
     await conn.query(
       `INSERT INTO RETURN_RECORD (condition_in, fine_amount, detail_id, received_by) VALUES (?,?,?,?)`,
@@ -64,11 +75,16 @@ router.post('/', requireAuth, requireRole('admin', 'approver'), async (req, res)
 
     await conn.query(`UPDATE ASSET SET status='available' WHERE asset_id=?`, [detail.asset_id]);
 
-    if (fineAmt > 0) {
+    if (lateFineAmt > 0) {
+      const reason = `ส่งคืนล่าช้า ${daysLate} วัน (วันละ ${FINE_PER_DAY} บาท)`;
+      const fine = await createFine(conn, { emp_id: detail.emp_id, detail_id, fine_type: 'late', amount: lateFineAmt, reason, created_by: req.user.emp_id });
+      fineInfos.push({ emp_id: detail.emp_id, fine_code: fine.fine_code, fine_type: 'late', amount: lateFineAmt, reason });
+    }
+    if (extraFineAmt > 0) {
       const type = FINE_TYPES.includes(fine_type) ? fine_type : 'other';
       const reason = (clean(fine_reason) || clean(condition_in) || TYPE_LABEL[type]).slice(0, 255);
-      fine = await createFine(conn, { emp_id: detail.emp_id, detail_id, fine_type: type, amount: fineAmt, reason, created_by: req.user.emp_id });
-      fineInfo = { emp_id: detail.emp_id, fine_code: fine.fine_code, fine_type: type, amount: fineAmt, reason };
+      const fine = await createFine(conn, { emp_id: detail.emp_id, detail_id, fine_type: type, amount: extraFineAmt, reason, created_by: req.user.emp_id });
+      fineInfos.push({ emp_id: detail.emp_id, fine_code: fine.fine_code, fine_type: type, amount: extraFineAmt, reason });
     }
 
     // if every detail row in this borrow request now has a return record, close the request
@@ -84,10 +100,10 @@ router.post('/', requireAuth, requireRole('admin', 'approver'), async (req, res)
     }
 
     await conn.commit();
-    if (fineInfo) emailFineCreated(fineInfo.emp_id, fineInfo);
+    fineInfos.forEach((info) => emailFineCreated(info.emp_id, info));
     res.status(201).json({
-      message: fine ? 'บันทึกการคืนสำเร็จ และแจ้งค่าปรับให้พนักงานแล้ว' : 'บันทึกการคืนสำเร็จ',
-      fine,
+      message: fineInfos.length ? 'บันทึกการคืนสำเร็จ และแจ้งค่าปรับให้พนักงานแล้ว' : 'บันทึกการคืนสำเร็จ',
+      fines: fineInfos,
     });
   } catch (err) {
     await conn.rollback();
