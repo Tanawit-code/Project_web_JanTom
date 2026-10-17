@@ -290,3 +290,4 @@ git push -u origin feature/ชื่อ-งาน        # แล้วเปิ
 - เพิ่ม rate limit, เพิกถอน token ทันทีหลังรีเซ็ตรหัสผ่าน
 - รายงาน/ส่งออก Excel, กราฟค่าปรับรายเดือน
 - ลบไฟล์เก่าที่ไม่ได้ใช้: `backend/index.js`, `backend/routes/products.js`, `frontend/src/views/Products.vue`, `AdminProducts.vue` และไฟล์เทมเพลต Vue ใน `components/`
+้hee
