@@ -12,6 +12,7 @@
 - [บัญชีสำหรับทดสอบ](#บัญชีสำหรับทดสอบ)
 - [ภาพรวมการทำงานและสิทธิ์ผู้ใช้](#ภาพรวมการทำงานและสิทธิ์ผู้ใช้)
 - [API โดยสรุป](#api-โดยสรุป)
+- [การแบ่งหน้าที่ในทีม](#การแบ่งหน้าที่ในทีม)
 - [วิธีทำงานร่วมกันด้วย Git](#วิธีทำงานร่วมกันด้วย-git)
 - [แก้ปัญหาที่เจอบ่อย](#แก้ปัญหาที่เจอบ่อย)
 - [ข้อควรระวังด้านความปลอดภัย](#ข้อควรระวังด้านความปลอดภัย)
@@ -187,25 +188,77 @@ node utils/createAdmin.js admin admin@example.com "Admin@1234"
 
 ทดสอบ API ด้วย Postman: ล็อกอินที่ `POST /api/auth/login` แล้วนำ `token` ที่ได้ไปใส่ในแท็บ Authorization (Bearer Token)
 
+## การแบ่งหน้าที่ในทีม
+
+แบ่งตาม **ส่วนของระบบ (module)** ให้แต่ละคนดูแลชุดไฟล์ของตัวเอง จะได้แก้ไฟล์ชนกันน้อยและรู้ว่าใครรับผิดชอบอะไร (ตารางด้านล่างเป็นตัวอย่าง 4 ส่วน ถ้าทีมมีคนน้อยกว่านี้ให้รวมบางส่วนเข้าด้วยกัน แล้วกรอกชื่อผู้รับผิดชอบ)
+
+| ส่วน | ไฟล์หลักที่ดูแล | ผู้รับผิดชอบ |
+|---|---|---|
+| **A. บัญชีผู้ใช้** | `routes/auth.js`, `routes/employees.js`, หน้า Login / Register / ลืมรหัสผ่าน, `AuthCard`, `AuthField`, หน้าจัดการพนักงาน | _(ใส่ชื่อ)_ |
+| **B. ทรัพย์สินและการยืม** | `routes/assets.js`, `categories.js`, `borrowRequests.js`, หน้า Assets, MyBorrows, Approvals, จัดการทรัพย์สิน | _(ใส่ชื่อ)_ |
+| **C. รับคืนและค่าปรับ** | `routes/returns.js`, `fines.js`, `notifications.js`, `utils/promptpay.js`, หน้า MyFines, AdminFines, AdminReturns, `NotificationBell` | _(ใส่ชื่อ)_ |
+| **D. แดชบอร์ด / UI กลาง / เอกสาร** | `routes/dashboard.js`, `AdminDashboard.vue`, `NavBar.vue`, `style.css`, README, ไฟล์ SQL | _(ใส่ชื่อ)_ |
+
+**ไฟล์ที่หลายคนต้องแตะ (เสี่ยงชนกันมากที่สุด):** `router/index.js`, `server.js`, `NavBar.vue`, `style.css`, `backend/sql/assetdb.sql`
+
+- แก้ไฟล์เหล่านี้ทีละน้อย ๆ แล้ว `git pull` บ่อย ๆ ถ้าจะแก้ก้อนใหญ่ให้แจ้งในกลุ่มก่อน
+- **ไฟล์ SQL:** ให้ผู้รับผิดชอบส่วน D เป็นคนรวมการเปลี่ยนแปลงลง `assetdb.sql` คนอื่นที่แก้โครงสร้างฐานข้อมูลให้ส่งเป็นไฟล์ `backend/sql/migration-ชื่องาน.sql` แล้วแจ้งให้ทุกคนรัน
+- ถ้าต้องแก้โค้ดในส่วนของคนอื่น ให้แจ้งใน Issue หรือ Pull Request ก่อน
+
+**เครื่องมือบน GitHub ที่ใช้**
+
+| เครื่องมือ | ใช้ทำอะไร |
+|---|---|
+| **Collaborators** | เจ้าของ repo เพิ่มเพื่อนที่ Settings → Collaborators (สิทธิ์ Write) |
+| **Issues** | หนึ่งงานต่อหนึ่ง Issue เช่น "ทำหน้ารายงานค่าปรับรายเดือน" แล้ว Assign ให้คนทำ ติด label `backend` `frontend` `bug` `feature` |
+| **Projects** | บอร์ดคอลัมน์ `To do` → `In progress` → `In review` → `Done` ให้ทุกคนเห็นว่าใครทำอะไรอยู่ |
+| **Milestones** | ตั้งตามกำหนดส่งงาน เช่น "สัปดาห์ที่ 4" แล้วผูก Issue เข้าไป จะเห็นเปอร์เซ็นต์ความคืบหน้า |
+| **Pull Request** | ทุกการแก้ไขเข้า `main` ต้องผ่าน PR ที่เพื่อนอย่างน้อย 1 คนรีวิว |
+
 ## วิธีทำงานร่วมกันด้วย Git
 
+`main` คือโค้ดที่รันได้เสมอ **ห้าม push ตรงเข้า `main`** ให้ทำงานบน branch ของตัวเองแล้วเปิด Pull Request
+
 ```bash
-git pull                          # ดึงงานล่าสุดก่อนเริ่มทำเสมอ
-git checkout -b feature/ชื่องาน    # แยก branch ต่อหนึ่งงาน เช่น feature/report-page
+git checkout main
+git pull                                  # ดึงงานล่าสุดก่อนเริ่มทำเสมอ
+git checkout -b feature/ชื่อ-งาน          # เช่น feature/somchai-fine-report
 # ... แก้โค้ด ...
-git status                        # ตรวจก่อน commit ว่าไม่มี .env, uploads, private_uploads หลุดมา
+git status                                # ตรวจก่อน commit ว่าไม่มี .env, uploads, private_uploads หลุดมา
 git add .
-git commit -m "อธิบายสิ่งที่ทำ"
-git push -u origin feature/ชื่องาน   # แล้วเปิด Pull Request ให้เพื่อนช่วยดู
+git commit -m "feat: เพิ่มกราฟค่าปรับรายเดือน"
+git push -u origin feature/ชื่อ-งาน        # แล้วเปิด Pull Request บน GitHub
 ```
+
+**ชื่อ branch:** `feature/...` (ฟีเจอร์ใหม่), `fix/...` (แก้บั๊ก), `docs/...` (เอกสาร)
+
+**รูปแบบ commit message:** ขึ้นต้นด้วยประเภทงาน แล้วอธิบายสั้น ๆ ให้เพื่อนอ่านรู้เรื่อง
+
+| ขึ้นต้นด้วย | ใช้เมื่อ | ตัวอย่าง |
+|---|---|---|
+| `feat:` | เพิ่มฟีเจอร์ | `feat: เพิ่มปุ่มกรองหมวดหมู่ในหน้า Assets` |
+| `fix:` | แก้บั๊ก | `fix: แก้วันครบกำหนดคลาดเคลื่อน 1 วัน` |
+| `docs:` | แก้เอกสาร/README | `docs: เพิ่มวิธีตั้งค่า SMTP` |
+| `refactor:` | จัดโค้ดใหม่ ไม่เปลี่ยนพฤติกรรม | `refactor: แยก utils/dates.js` |
+
+**ก่อนเปิด Pull Request ให้เช็กตามนี้**
+
+- [ ] รันทั้ง backend และ frontend แล้วทดสอบฟีเจอร์ที่แก้ได้จริง
+- [ ] `git status` แล้วไม่มี `.env`, `backend/uploads/`, `backend/private_uploads/` ติดมา
+- [ ] ถ้าเพิ่มตัวแปรใน `.env` → เพิ่มใน `.env.example` ด้วย
+- [ ] ถ้าเปลี่ยนโครงสร้างฐานข้อมูล → แนบไฟล์ `migration-*.sql` และแจ้งในกลุ่ม
+- [ ] ถ้าเพิ่มแพ็กเกจใหม่ → commit `package.json` และ `package-lock.json`
+- [ ] อัปเดต README ถ้าฟีเจอร์ API หรือขั้นตอนติดตั้งเปลี่ยน
 
 **กติกาของทีม**
 
 - ❌ ห้าม commit: `.env`, รหัสผ่าน, App Password, รูปสลิป (`backend/private_uploads/`), ไฟล์ที่เก็บข้อมูลส่วนตัว
-- เปลี่ยนโครงสร้างฐานข้อมูล → เขียนไฟล์ `backend/sql/migration-xxx.sql` แล้วอัปเดต `assetdb.sql` ให้ตรงกัน และแจ้งในกลุ่มให้ทุกคนรันไฟล์ migration
-- เพิ่มตัวแปรใน `.env` → เพิ่มใน `.env.example` ด้วย พร้อมคอมเมนต์อธิบาย
-- ติดตั้งแพ็กเกจใหม่ → commit `package.json` และ `package-lock.json` แล้วบอกเพื่อนรัน `npm install`
+- งานที่ใช้เวลาเกิน 2-3 วัน ให้ดึง `main` มาผสมใน branch ตัวเองบ่อย ๆ ด้วย `git pull origin main` จะได้แก้ conflict ทีละน้อย
+- เจอไฟล์ชนกัน (conflict) ให้คนที่เปิด PR ทีหลังเป็นคนแก้
 - หลัง `git pull` ถ้า `package.json` เปลี่ยน ให้รัน `npm install` ใหม่ทั้ง backend และ frontend
+- เมื่อ merge PR แล้วให้ลบ branch ที่ทำเสร็จทิ้ง
+- ตั้ง Settings → Branches → Add rule ที่ `main` และเปิด "Require a pull request before merging" (repo private บนแพ็กเกจฟรีอาจไม่มีฟีเจอร์นี้ ให้ตกลงกติกากันเองแทน)
+- แนะนำให้หมุนเวียนหน้าที่รายสัปดาห์ เช่น คนหนึ่งดูแล `main` ให้รันได้เสมอ อีกคนอัปเดตบอร์ดและสรุปความคืบหน้า
 
 **รูปทรัพย์สินตัวอย่าง:** โฟลเดอร์ `backend/uploads/` ถูก ignore (กันรูปที่ทดสอบอัปโหลดหลุดขึ้น Git) แต่รูปตัวอย่างที่ข้อมูลตั้งต้นอ้างถึงถูก add ไว้แล้วด้วย `git add -f` ถ้าต้องเพิ่มรูปตัวอย่างใหม่ที่อยากแชร์ ให้ใช้ `git add -f backend/uploads/ชื่อไฟล์`
 
@@ -237,3 +290,4 @@ git push -u origin feature/ชื่องาน   # แล้วเปิด Pu
 - เพิ่ม rate limit, เพิกถอน token ทันทีหลังรีเซ็ตรหัสผ่าน
 - รายงาน/ส่งออก Excel, กราฟค่าปรับรายเดือน
 - ลบไฟล์เก่าที่ไม่ได้ใช้: `backend/index.js`, `backend/routes/products.js`, `frontend/src/views/Products.vue`, `AdminProducts.vue` และไฟล์เทมเพลต Vue ใน `components/`
+้hee
