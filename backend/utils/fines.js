@@ -6,6 +6,8 @@ const { sendNotifyEmail } = require('./mailer');
 const FINE_TYPES = ['late', 'damaged', 'other'];
 const STATUSES = ['unpaid', 'slip_submitted', 'paid', 'cancelled'];
 const TYPE_LABEL = { late: 'ส่งคืนล่าช้า', damaged: 'ทรัพย์สินชำรุด/เสียหาย', other: 'ค่าปรับอื่น ๆ' };
+const FINE_PER_DAY = Number(process.env.FINE_PER_DAY) > 0 ? Number(process.env.FINE_PER_DAY) : 100;
+const calculateLateFine = (daysLate) => Math.max(0, Math.floor(Number(daysLate) || 0)) * FINE_PER_DAY;
 const fmtMoney = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const frontendUrl = () => process.env.FRONTEND_URL || 'http://localhost:5180';
 
@@ -61,4 +63,4 @@ async function emailFineCreated(emp_id, { fine_code, fine_type, amount, reason }
   }
 }
 
-module.exports = { FINE_TYPES, STATUSES, TYPE_LABEL, fmtMoney, frontendUrl, createFine, emailFineCreated };
+module.exports = { FINE_TYPES, STATUSES, TYPE_LABEL, FINE_PER_DAY, calculateLateFine, fmtMoney, frontendUrl, createFine, emailFineCreated };
