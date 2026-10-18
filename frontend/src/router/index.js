@@ -17,12 +17,15 @@ import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import AdminFines from '../views/admin/AdminFines.vue';
 import MyFines from '../views/MyFines.vue';
 import Contact from '../views/Contact.vue';
+import Profile from '../views/Profile.vue';
+import ConfirmEmailChange from '../views/ConfirmEmailChange.vue';
 
 const routes = [
   { path: '/login', component: Login },
   { path: '/register', component: Register },
   { path: '/forgot-password', component: ForgotPassword },
   { path: '/reset-password', component: ResetPassword },
+  { path: '/confirm-email-change', component: ConfirmEmailChange },
   { path: '/approve-registration', component: ApproveRegistration, meta: { requiresRole: ['admin'] } },
   { path: '/', component: Home, meta: { requiresAuth: true } },
   { path: '/assets', component: Assets, meta: { requiresAuth: true } },
@@ -35,6 +38,7 @@ const routes = [
   { path: '/admin/fines', component: AdminFines, meta: { requiresRole: ['admin'] } },
   { path: '/admin/employees', component: AdminEmployees, meta: { requiresRole: ['admin'] } },
   { path: '/contact', component: Contact, meta: { requiresAuth: true } },
+  { path: '/profile', component: Profile, meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });
