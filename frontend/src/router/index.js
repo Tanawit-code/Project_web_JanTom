@@ -19,6 +19,7 @@ import MyFines from '../views/MyFines.vue';
 import Contact from '../views/Contact.vue';
 import Profile from '../views/Profile.vue';
 import ConfirmEmailChange from '../views/ConfirmEmailChange.vue';
+import ConfirmPasswordChange from '../views/ConfirmPasswordChange.vue';
 
 const routes = [
   { path: '/login', component: Login },
@@ -26,6 +27,7 @@ const routes = [
   { path: '/forgot-password', component: ForgotPassword },
   { path: '/reset-password', component: ResetPassword },
   { path: '/confirm-email-change', component: ConfirmEmailChange },
+  { path: '/confirm-password-change', component: ConfirmPasswordChange },
   { path: '/approve-registration', component: ApproveRegistration, meta: { requiresRole: ['admin'] } },
   { path: '/', component: Home, meta: { requiresAuth: true } },
   { path: '/assets', component: Assets, meta: { requiresAuth: true } },

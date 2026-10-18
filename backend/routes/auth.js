@@ -6,7 +6,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validatePasswordStrength } = require('../utils/password');
-const { sendApprovalRequestEmail, sendRegistrationResultEmail, sendResetEmail, sendEmailChangeConfirmation } = require('../utils/mailer');
+const { sendApprovalRequestEmail, sendRegistrationResultEmail, sendResetEmail, sendEmailChangeConfirmation, sendPasswordChangeConfirmation } = require('../utils/mailer');
 require('dotenv').config();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -243,24 +243,65 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// Update the signed-in user's name and password. Password changes always require the current password.
+// แก้ชื่อ-นามสกุลได้ทันที ส่วนการเปลี่ยนรหัสผ่านต้องยืนยันผ่านลิงก์ในอีเมลก่อน
+// (เก็บรหัสใหม่แบบ hash ไว้ใน pending_password_hash จนกว่าจะกดลิงก์ยืนยัน)
+const PASSWORD_CHANGE_TTL_MINUTES = 30;
 router.patch('/profile', requireAuth, async (req, res) => {
   try {
     const firstName = clean(req.body.first_name);
     const lastName = clean(req.body.last_name);
     const { currentPassword, newPassword } = req.body;
     if (!firstName || !lastName) return res.status(400).json({ message: 'กรุณากรอกชื่อและนามสกุล' });
-    const [rows] = await pool.query("SELECT password_hash FROM EMPLOYEE WHERE emp_id = ? AND status = 'active'", [req.user.emp_id]);
+    const [rows] = await pool.query("SELECT password_hash, email FROM EMPLOYEE WHERE emp_id = ? AND status = 'active'", [req.user.emp_id]);
     if (!rows.length) return res.status(404).json({ message: 'ไม่พบบัญชีผู้ใช้' });
-    let passwordHash = rows[0].password_hash;
+
+    let token = null;
     if (newPassword) {
-      if (!currentPassword || !(await bcrypt.compare(currentPassword, passwordHash))) return res.status(400).json({ message: 'รหัสผ่านเดิมไม่ถูกต้อง' });
+      if (!currentPassword || !(await bcrypt.compare(currentPassword, rows[0].password_hash))) return res.status(400).json({ message: 'รหัสผ่านเดิมไม่ถูกต้อง' });
       const check = validatePasswordStrength(newPassword);
       if (!check.valid) return res.status(400).json({ message: check.message });
-      passwordHash = await bcrypt.hash(newPassword, 10);
+      if (!rows[0].email) return res.status(400).json({ message: 'บัญชีนี้ยังไม่มีอีเมล จึงยืนยันการเปลี่ยนรหัสผ่านไม่ได้' });
+      token = crypto.randomBytes(32).toString('hex');
     }
-    await pool.query('UPDATE EMPLOYEE SET first_name = ?, last_name = ?, password_hash = ? WHERE emp_id = ?', [firstName, lastName, passwordHash, req.user.emp_id]);
-    res.json({ message: 'บันทึกข้อมูลเรียบร้อย', user: { first_name: firstName, last_name: lastName } });
+
+    await pool.query('UPDATE EMPLOYEE SET first_name = ?, last_name = ? WHERE emp_id = ?', [firstName, lastName, req.user.emp_id]);
+    const user = { first_name: firstName, last_name: lastName };
+    if (!token) return res.json({ message: 'บันทึกข้อมูลเรียบร้อย', user });
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      'UPDATE EMPLOYEE SET pending_password_hash = ?, password_change_token_hash = ?, password_change_expires = DATE_ADD(NOW(), INTERVAL ? MINUTE) WHERE emp_id = ?',
+      [newHash, sha256(token), PASSWORD_CHANGE_TTL_MINUTES, req.user.emp_id]
+    );
+    const link = `${process.env.FRONTEND_URL || 'http://localhost:5180'}/confirm-password-change?token=${token}`;
+    let sent = false;
+    try { sent = await sendPasswordChangeConfirmation(rows[0].email, link); }
+    catch (mailErr) { console.error('[password-change] send mail failed:', mailErr.message); }
+    if (!sent) {
+      await pool.query('UPDATE EMPLOYEE SET pending_password_hash = NULL, password_change_token_hash = NULL, password_change_expires = NULL WHERE emp_id = ? AND password_change_token_hash = ?', [req.user.emp_id, sha256(token)]);
+      return res.status(503).json({ message: 'บันทึกชื่อแล้ว แต่ส่งอีเมลยืนยันการเปลี่ยนรหัสผ่านไม่ได้ (ตรวจสอบการตั้งค่า SMTP) รหัสผ่านยังไม่ถูกเปลี่ยน', user });
+    }
+    res.json({ message: `ส่งลิงก์ยืนยันการเปลี่ยนรหัสผ่านไปที่อีเมลของคุณแล้ว กรุณายืนยันภายใน ${PASSWORD_CHANGE_TTL_MINUTES} นาที รหัสผ่านจะเปลี่ยนเมื่อกดลิงก์เท่านั้น`, user, passwordPending: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// ยืนยันการเปลี่ยนรหัสผ่านจากลิงก์ในอีเมล (POST กันระบบสแกนลิงก์กดให้เอง; ใช้ได้ครั้งเดียว)
+router.post('/confirm-password-change', async (req, res) => {
+  try {
+    const token = clean(req.body.token);
+    if (!token) return res.status(400).json({ message: 'ไม่พบลิงก์ยืนยัน' });
+    const [result] = await pool.query(
+      `UPDATE EMPLOYEE SET password_hash = pending_password_hash, pending_password_hash = NULL,
+         password_change_token_hash = NULL, password_change_expires = NULL
+       WHERE password_change_token_hash = ? AND password_change_expires > NOW()
+         AND pending_password_hash IS NOT NULL AND status = 'active'`,
+      [sha256(token)]
+    );
+    if (!result.affectedRows) return res.status(400).json({ message: 'ลิงก์ยืนยันไม่ถูกต้อง ถูกใช้ไปแล้ว หรือหมดอายุ กรุณาขอเปลี่ยนรหัสผ่านใหม่' });
+    res.json({ message: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });

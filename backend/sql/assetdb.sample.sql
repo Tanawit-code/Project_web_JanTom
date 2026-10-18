@@ -105,6 +105,9 @@ CREATE TABLE `employee` (
   `pending_email` varchar(100) DEFAULT NULL,
   `email_change_token_hash` char(64) DEFAULT NULL,
   `email_change_expires` datetime DEFAULT NULL,
+  `pending_password_hash` varchar(255) DEFAULT NULL,
+  `password_change_token_hash` char(64) DEFAULT NULL,
+  `password_change_expires` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `dept_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
