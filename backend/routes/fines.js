@@ -7,6 +7,7 @@ const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { uploadSlip, SLIP_DIR } = require('../middleware/uploadSlip');
 const { buildPromptPayPayload } = require('../utils/promptpay');
+const slipVerify = require('../utils/slipVerify');
 const { notify, notifyAdmins } = require('../utils/notify');
 const { sendNotifyEmail } = require('../utils/mailer');
 const { FINE_TYPES, STATUSES, TYPE_LABEL, fmtMoney, frontendUrl, createFine, emailFineCreated } = require('../utils/fines');
@@ -22,6 +23,7 @@ const h = (fn) => (req, res) =>
 const SELECT_FINE = `
   SELECT f.fine_id, f.fine_code, f.emp_id, f.detail_id, f.fine_type, f.amount, f.reason, f.status,
          (f.slip_file IS NOT NULL) AS has_slip, f.review_note,
+         f.verify_result, f.verify_note, f.auto_paid,
          DATE_FORMAT(f.created_at, '%Y-%m-%d %H:%i') AS created_at,
          DATE_FORMAT(f.slip_uploaded_at, '%Y-%m-%d %H:%i') AS slip_uploaded_at,
          DATE_FORMAT(f.paid_at, '%Y-%m-%d %H:%i') AS paid_at,
@@ -32,7 +34,7 @@ const SELECT_FINE = `
   LEFT JOIN BORROW_DETAIL bd ON bd.detail_id = f.detail_id
   LEFT JOIN ASSET a ON a.asset_id = bd.asset_id
   LEFT JOIN BORROW_REQUEST br ON br.borrow_id = bd.borrow_id`;
-const shape = (r) => ({ ...r, amount: Number(r.amount), has_slip: !!r.has_slip, type_label: TYPE_LABEL[r.fine_type] });
+const shape = (r) => ({ ...r, amount: Number(r.amount), has_slip: !!r.has_slip, auto_paid: !!r.auto_paid, type_label: TYPE_LABEL[r.fine_type] });
 
 function looksLikeImage(b) {
   if (b.length < 12) return false;
@@ -44,6 +46,11 @@ function looksLikeImage(b) {
 const removeSlip = (file) => { if (file) fs.unlink(path.join(SLIP_DIR, path.basename(file)), () => {}); };
 
 // ---------------- พนักงาน ----------------
+// ให้หน้าเว็บรู้ว่าเปิดระบบตรวจสลิปอัตโนมัติหรือไม่
+router.get('/config', requireAuth, (req, res) => {
+  res.json({ auto_verify: slipVerify.enabled() });
+});
+
 router.get('/mine', requireAuth, h(async (req, res) => {
   const [rows] = await pool.query(
     `${SELECT_FINE} WHERE f.emp_id = ?
@@ -83,7 +90,20 @@ router.get('/:id/qr', requireAuth, h(async (req, res) => {
   res.json({ payload, amount: Number(fine.amount), account_name: process.env.PROMPTPAY_NAME || '', fine_code: fine.fine_code });
 }));
 
+// จำกัดจำนวนครั้งที่ส่งตรวจต่อรายการ (กันเปลืองโควต้า API ของผู้ให้บริการตรวจสลิป)
+const attempts = new Map();
+function tooManyAttempts(fineId) {
+  const now = Date.now();
+  const list = (attempts.get(fineId) || []).filter((t) => now - t < 3600000);
+  const blocked = list.length >= 6;
+  if (!blocked) list.push(now);
+  attempts.set(fineId, list);
+  return blocked;
+}
+
 // แนบสลิป (เจ้าของรายการเท่านั้น)
+// ถ้าเปิด SLIP_PROVIDER ระบบจะตรวจสลิปอัตโนมัติ: ผ่าน = ชำระแล้วทันที, ไม่ผ่านชัดเจน = ปฏิเสธทันที,
+// ตรวจไม่ได้/ไม่แน่ใจ = ส่งให้ admin ตรวจเอง (ไม่ปฏิเสธมั่ว)
 router.post('/:id/slip', requireAuth, (req, res) => {
   uploadSlip.single('slip')(req, res, async (err) => {
     const file = req.file;
@@ -94,7 +114,10 @@ router.post('/:id/slip', requireAuth, (req, res) => {
     if (!file) return res.status(400).json({ message: 'กรุณาแนบรูปสลิป' });
     try {
       const id = Number(req.params.id);
-      const [[fine]] = await pool.query('SELECT * FROM FINE WHERE fine_id = ? AND emp_id = ?', [id, req.user.emp_id]);
+      const [[fine]] = await pool.query(
+        'SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS fine_age_min FROM FINE WHERE fine_id = ? AND emp_id = ?',
+        [id, req.user.emp_id]
+      );
       if (!fine) { cleanup(); return res.status(404).json({ message: 'ไม่พบรายการค่าปรับ' }); }
       if (fine.status !== 'unpaid') { cleanup(); return res.status(409).json({ message: 'รายการนี้ไม่อยู่ในสถานะที่แนบสลิปได้' }); }
 
@@ -104,31 +127,86 @@ router.post('/:id/slip', requireAuth, (req, res) => {
       const [dups] = await pool.query('SELECT fine_id FROM FINE WHERE slip_hash = ? AND fine_id <> ?', [hash, id]);
       if (dups.length > 0) { cleanup(); return res.status(409).json({ message: 'สลิปนี้เคยถูกใช้กับรายการอื่นแล้ว' }); }
 
-      const [upd] = await pool.query(
-        `UPDATE FINE SET status = 'slip_submitted', slip_file = ?, slip_hash = ?, slip_uploaded_at = NOW(), review_note = NULL
-         WHERE fine_id = ? AND emp_id = ? AND status = 'unpaid'`,
-        [file.filename, hash, id, req.user.emp_id]
-      );
+      // ---- ตรวจสลิปอัตโนมัติ (ถ้าเปิดใช้) ----
+      let outcome = { action: 'review', verify_result: null, note: null };
+      if (slipVerify.enabled()) {
+        if (tooManyAttempts(id)) {
+          cleanup();
+          return res.status(429).json({ message: 'ส่งสลิปบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่' });
+        }
+        const result = await slipVerify.verifySlipImage(buf, file.originalname, file.mimetype, { expectedAmount: Number(fine.amount) });
+        let duplicateRef = false;
+        if (result.ok && result.data.transRef) {
+          const [d] = await pool.query('SELECT fine_id FROM FINE WHERE slip_trans_ref = ? AND fine_id <> ?', [String(result.data.transRef), id]);
+          duplicateRef = d.length > 0;
+        }
+        outcome = slipVerify.evaluateSlip(result, fine, { fineAgeMin: Number(fine.fine_age_min), duplicateRef });
+        if (outcome.verify_result === 'unavailable') console.error('[fines] auto verify unavailable:', outcome.note);
+        if (outcome.action === 'reject') {
+          cleanup();
+          return res.status(422).json({ message: outcome.message, rejected: true });
+        }
+      }
+
+      const approve = outcome.action === 'approve';
+      const common = [file.filename, hash, outcome.transRef || null, outcome.verify_result || null, outcome.note || null, id, req.user.emp_id];
+      let upd;
+      try {
+        [upd] = approve
+          ? await pool.query(
+              `UPDATE FINE SET status = 'paid', paid_at = NOW(), slip_file = ?, slip_hash = ?, slip_trans_ref = ?, slip_uploaded_at = NOW(),
+                      verify_result = ?, verify_note = ?, auto_paid = 1, review_note = NULL, reviewed_by = NULL
+               WHERE fine_id = ? AND emp_id = ? AND status = 'unpaid'`, common)
+          : await pool.query(
+              `UPDATE FINE SET status = 'slip_submitted', slip_file = ?, slip_hash = ?, slip_trans_ref = ?, slip_uploaded_at = NOW(),
+                      verify_result = ?, verify_note = ?, auto_paid = 0, review_note = NULL
+               WHERE fine_id = ? AND emp_id = ? AND status = 'unpaid'`, common);
+      } catch (e) {
+        if (e.code === 'ER_DUP_ENTRY') { cleanup(); return res.status(409).json({ message: 'สลิปนี้เคยใช้ชำระรายการอื่นแล้ว' }); }
+        throw e;
+      }
       if (upd.affectedRows === 0) { cleanup(); return res.status(409).json({ message: 'ไม่สามารถแนบสลิปได้ กรุณารีเฟรชหน้า' }); }
 
-      const [[emp]] = await pool.query('SELECT first_name, last_name FROM EMPLOYEE WHERE emp_id = ?', [req.user.emp_id]);
+      const [[emp]] = await pool.query('SELECT first_name, last_name, email FROM EMPLOYEE WHERE emp_id = ?', [req.user.emp_id]);
       const who = emp ? `${emp.first_name} ${emp.last_name}` : 'พนักงาน';
+
+      if (approve) {
+        await notify(pool, req.user.emp_id, {
+          type: 'fine_paid', title: 'ชำระค่าปรับเรียบร้อย (ตรวจสอบอัตโนมัติ)',
+          message: `ค่าปรับ ${fine.fine_code} จำนวน ${fmtMoney(fine.amount)} บาท ชำระเรียบร้อย ขอบคุณครับ`, link: '/my-fines',
+        });
+        await notifyAdmins(pool, {
+          type: 'fine_paid', title: 'พนักงานชำระค่าปรับแล้ว (ตรวจสลิปอัตโนมัติ)',
+          message: `${who} ชำระค่าปรับ ${fine.fine_code} จำนวน ${fmtMoney(fine.amount)} บาท`, link: '/admin/fines',
+        });
+        if (emp && emp.email) {
+          sendNotifyEmail({
+            to: emp.email,
+            subject: `ชำระค่าปรับ ${fine.fine_code} เรียบร้อยแล้ว`,
+            heading: `เรียน คุณ${emp.first_name}`,
+            lines: [`ระบบตรวจสอบสลิปอัตโนมัติแล้ว ค่าปรับ ${fine.fine_code} จำนวน ${fmtMoney(fine.amount)} บาท ชำระเรียบร้อย`],
+            link: `${frontendUrl()}/my-fines`, linkText: 'ไปหน้าค่าปรับของฉัน',
+          }).catch((e) => console.error('[fines] email:', e.message));
+        }
+        return res.json({ message: 'ชำระค่าปรับเรียบร้อย ระบบตรวจสลิปอัตโนมัติแล้ว', auto_verified: true });
+      }
+
       await notifyAdmins(pool, {
         type: 'slip_submitted',
         title: 'มีสลิปค่าปรับรอตรวจสอบ',
-        message: `${who} ส่งสลิปค่าปรับ ${fine.fine_code} จำนวน ${fmtMoney(fine.amount)} บาท`,
+        message: `${who} ส่งสลิปค่าปรับ ${fine.fine_code} จำนวน ${fmtMoney(fine.amount)} บาท${outcome.note ? ` — ${outcome.note}` : ''}`,
         link: '/admin/fines',
       });
       sendNotifyEmail({
         to: process.env.ADMIN_EMAIL,
         subject: `สลิปค่าปรับรอตรวจสอบ ${fine.fine_code}`,
         heading: 'มีสลิปค่าปรับรอตรวจสอบ',
-        lines: [`ผู้ชำระ: ${who}`, `รายการ: ${fine.fine_code}`, `จำนวน: ${fmtMoney(fine.amount)} บาท`],
+        lines: [`ผู้ชำระ: ${who}`, `รายการ: ${fine.fine_code}`, `จำนวน: ${fmtMoney(fine.amount)} บาท`, ...(outcome.note ? [`หมายเหตุจากระบบ: ${outcome.note}`] : [])],
         link: `${frontendUrl()}/admin/fines`,
         linkText: 'ไปตรวจสอบสลิป',
       }).catch((e) => console.error('[fines] admin email:', e.message));
 
-      res.json({ message: 'ส่งสลิปเรียบร้อย รอผู้ดูแลระบบตรวจสอบ' });
+      res.json({ message: 'ส่งสลิปเรียบร้อย รอผู้ดูแลระบบตรวจสอบ', needs_review: true });
     } catch (e) {
       cleanup();
       console.error('[fines] slip:', e);
@@ -208,12 +286,13 @@ router.patch('/:id/review', requireAuth, requireRole('admin'), h(async (req, res
   let upd;
   if (action === 'approve') {
     [upd] = await pool.query(
-      `UPDATE FINE SET status = 'paid', paid_at = NOW(), reviewed_by = ?, review_note = NULL
+      `UPDATE FINE SET status = 'paid', paid_at = NOW(), reviewed_by = ?, review_note = NULL, auto_paid = 0
        WHERE fine_id = ? AND status = 'slip_submitted'`, [req.user.emp_id, id]);
   } else {
     [upd] = await pool.query(
       `UPDATE FINE SET status = 'unpaid', review_note = ?, reviewed_by = ?,
-              slip_file = NULL, slip_hash = NULL, slip_uploaded_at = NULL
+              slip_file = NULL, slip_hash = NULL, slip_trans_ref = NULL, slip_uploaded_at = NULL,
+              verify_result = NULL, verify_note = NULL, auto_paid = 0
        WHERE fine_id = ? AND status = 'slip_submitted'`, [note, req.user.emp_id, id]);
     if (upd.affectedRows > 0) removeSlip(fine.slip_file);
   }
