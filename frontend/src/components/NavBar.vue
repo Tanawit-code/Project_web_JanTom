@@ -109,6 +109,7 @@ const money = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 
                 <b>{{ authState.user.first_name }} {{ authState.user.last_name }}</b>
                 <span class="role">{{ ROLE_TH[authState.user.role] || authState.user.role }}</span>
               </div>
+              <router-link to="/profile" class="item"><span class="ico">⚙️</span>จัดการบัญชี</router-link>
               <template v-if="isAdmin">
                 <router-link to="/my-borrows" class="item"><span class="ico">📝</span>คำขอของฉัน</router-link>
                 <router-link to="/my-fines" class="item"><span class="ico">💸</span>ค่าปรับของฉัน<span v-if="unpaid.count > 0" class="pill dark">{{ unpaid.count }}</span></router-link>

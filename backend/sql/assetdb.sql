@@ -179,6 +179,9 @@ CREATE TABLE `employee` (
   `approval_expires` datetime DEFAULT NULL,
   `reset_token_hash` char(64) DEFAULT NULL,
   `reset_expires` datetime DEFAULT NULL,
+  `pending_email` varchar(100) DEFAULT NULL,
+  `email_change_token_hash` char(64) DEFAULT NULL,
+  `email_change_expires` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `dept_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

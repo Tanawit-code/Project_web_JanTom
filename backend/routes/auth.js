@@ -6,7 +6,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validatePasswordStrength } = require('../utils/password');
-const { sendApprovalRequestEmail, sendRegistrationResultEmail, sendResetEmail } = require('../utils/mailer');
+const { sendApprovalRequestEmail, sendRegistrationResultEmail, sendResetEmail, sendEmailChangeConfirmation } = require('../utils/mailer');
 require('dotenv').config();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -43,6 +43,7 @@ router.post('/login', async (req, res) => {
       user: {
         emp_id: emp.emp_id, username: emp.username, role: emp.role,
         first_name: emp.first_name, last_name: emp.last_name,
+        email: emp.email,
       },
     });
   } catch (err) {
@@ -236,6 +237,71 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ message: 'ลิงก์ไม่ถูกต้อง ถูกใช้ไปแล้ว หรือหมดอายุ กรุณาขอลิงก์ใหม่' });
     }
     res.json({ message: 'ตั้งรหัสผ่านใหม่เรียบร้อย กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// Update the signed-in user's name and password. Password changes always require the current password.
+router.patch('/profile', requireAuth, async (req, res) => {
+  try {
+    const firstName = clean(req.body.first_name);
+    const lastName = clean(req.body.last_name);
+    const { currentPassword, newPassword } = req.body;
+    if (!firstName || !lastName) return res.status(400).json({ message: 'กรุณากรอกชื่อและนามสกุล' });
+    const [rows] = await pool.query("SELECT password_hash FROM EMPLOYEE WHERE emp_id = ? AND status = 'active'", [req.user.emp_id]);
+    if (!rows.length) return res.status(404).json({ message: 'ไม่พบบัญชีผู้ใช้' });
+    let passwordHash = rows[0].password_hash;
+    if (newPassword) {
+      if (!currentPassword || !(await bcrypt.compare(currentPassword, passwordHash))) return res.status(400).json({ message: 'รหัสผ่านเดิมไม่ถูกต้อง' });
+      const check = validatePasswordStrength(newPassword);
+      if (!check.valid) return res.status(400).json({ message: check.message });
+      passwordHash = await bcrypt.hash(newPassword, 10);
+    }
+    await pool.query('UPDATE EMPLOYEE SET first_name = ?, last_name = ?, password_hash = ? WHERE emp_id = ?', [firstName, lastName, passwordHash, req.user.emp_id]);
+    res.json({ message: 'บันทึกข้อมูลเรียบร้อย', user: { first_name: firstName, last_name: lastName } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+const EMAIL_CHANGE_TTL_MINUTES = 30;
+router.post('/profile/email-change', requireAuth, async (req, res) => {
+  try {
+    const email = clean(req.body.email).toLowerCase();
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ message: 'รูปแบบอีเมลไม่ถูกต้อง' });
+    const [users] = await pool.query("SELECT email FROM EMPLOYEE WHERE emp_id = ? AND status = 'active'", [req.user.emp_id]);
+    if (!users.length) return res.status(404).json({ message: 'ไม่พบบัญชีผู้ใช้' });
+    if (users[0].email?.toLowerCase() === email) return res.status(400).json({ message: 'อีเมลใหม่ต้องไม่ซ้ำกับอีเมลปัจจุบัน' });
+    const [duplicates] = await pool.query('SELECT emp_id FROM EMPLOYEE WHERE LOWER(email) = ? AND emp_id <> ?', [email, req.user.emp_id]);
+    if (duplicates.length) return res.status(409).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+    const token = crypto.randomBytes(32).toString('hex');
+    await pool.query('UPDATE EMPLOYEE SET pending_email = ?, email_change_token_hash = ?, email_change_expires = DATE_ADD(NOW(), INTERVAL ? MINUTE) WHERE emp_id = ?', [email, sha256(token), EMAIL_CHANGE_TTL_MINUTES, req.user.emp_id]);
+    const link = `${process.env.FRONTEND_URL || 'http://localhost:5180'}/confirm-email-change?token=${token}`;
+    const sent = await sendEmailChangeConfirmation(users[0].email, email, link);
+    if (!sent) {
+      await pool.query('UPDATE EMPLOYEE SET pending_email = NULL, email_change_token_hash = NULL, email_change_expires = NULL WHERE emp_id = ? AND email_change_token_hash = ?', [req.user.emp_id, sha256(token)]);
+      return res.status(503).json({ message: 'ยังไม่ได้ตั้งค่าการส่งอีเมล จึงส่งลิงก์ยืนยันไม่ได้' });
+    }
+    res.json({ message: 'ส่งลิงก์ยืนยันไปยังอีเมลเดิมแล้ว กรุณายืนยันภายใน 30 นาที' });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+router.get('/confirm-email-change/:token', async (req, res) => {
+  try {
+    const tokenHash = sha256(req.params.token);
+    const [rows] = await pool.query("SELECT emp_id, pending_email FROM EMPLOYEE WHERE email_change_token_hash = ? AND email_change_expires > NOW() AND status = 'active'", [tokenHash]);
+    if (!rows.length) return res.status(400).json({ message: 'ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุแล้ว' });
+    const { emp_id, pending_email } = rows[0];
+    const [result] = await pool.query('UPDATE EMPLOYEE SET email = ?, pending_email = NULL, email_change_token_hash = NULL, email_change_expires = NULL WHERE emp_id = ? AND email_change_token_hash = ?', [pending_email, emp_id, tokenHash]);
+    if (!result.affectedRows) return res.status(400).json({ message: 'ลิงก์ยืนยันนี้ถูกใช้ไปแล้ว' });
+    res.json({ message: 'ยืนยันและเปลี่ยนอีเมลเรียบร้อยแล้ว', email: pending_email });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
