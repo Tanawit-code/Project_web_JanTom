@@ -154,6 +154,10 @@ onBeforeUnmount(() => { clearInterval(timer); if (dlg.imgUrl) URL.revokeObjectUR
           <template v-if="f.slip_uploaded_at"> · ส่งสลิป {{ f.slip_uploaded_at }}</template>
           <template v-if="f.paid_at"> · ชำระเมื่อ {{ f.paid_at }}</template>
         </div>
+        <div v-if="f.verify_note && (f.status === 'slip_submitted' || f.auto_paid)" class="vchip" :class="'v-' + (f.auto_paid ? 'verified' : f.verify_result)">
+          <b>{{ f.auto_paid ? '✓ ตรวจสลิปอัตโนมัติแล้ว' : f.verify_result === 'needs_review' ? '⚠ ระบบตรวจแล้ว แต่ให้ตรวจเอง' : 'ℹ ตรวจอัตโนมัติไม่ได้' }}</b>
+          <span>{{ f.verify_note }}</span>
+        </div>
         <div v-if="f.status === 'unpaid' && f.review_note" class="small bad">สลิปล่าสุดถูกปฏิเสธ: {{ f.review_note }}</div>
       </div>
       <div class="side">
@@ -173,6 +177,10 @@ onBeforeUnmount(() => { clearInterval(timer); if (dlg.imgUrl) URL.revokeObjectUR
             <h3>ตรวจสลิปการโอนเงิน</h3>
             <p class="muted small">{{ dlg.fine.first_name }} {{ dlg.fine.last_name }} · {{ dlg.fine.fine_code }}</p>
             <div class="expect">ยอดที่ต้องได้รับ <b>฿{{ money(dlg.fine.amount) }}</b></div>
+            <div v-if="dlg.fine.verify_note" class="vchip" :class="'v-' + dlg.fine.verify_result">
+              <b>{{ dlg.fine.verify_result === 'needs_review' ? '⚠ ระบบตรวจแล้ว แต่ให้ตรวจเอง' : 'ℹ ตรวจอัตโนมัติไม่ได้' }}</b>
+              <span>{{ dlg.fine.verify_note }}</span>
+            </div>
             <div class="slipbox">
               <p v-if="dlg.imgErr" class="error-text">{{ dlg.imgErr }}</p>
               <p v-else-if="!dlg.imgUrl" class="muted">กำลังโหลดสลิป...</p>
@@ -222,6 +230,12 @@ onBeforeUnmount(() => { clearInterval(timer); if (dlg.imgUrl) URL.revokeObjectUR
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .bad { color: var(--danger); margin-top: 4px; }
+.vchip { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding: 8px 12px; border-radius: 10px; font-size: 12px; line-height: 1.5; }
+.vchip b { font-size: 12px; }
+.v-verified { background: #e3f4ea; color: #1f6b3d; }
+.v-needs_review { background: #fdf3dc; color: #8a5a00; }
+.v-unavailable { background: #eef0f4; color: #4b5563; }
+.expect + .vchip { margin: 0 0 10px; }
 
 .create { background: #fff; border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0, 0, 0, .06); }
 .create h3 { margin: 0 0 4px; }

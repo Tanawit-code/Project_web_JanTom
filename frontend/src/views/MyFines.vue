@@ -5,6 +5,8 @@ import api from '../services/api';
 
 const fines = ref([]);
 const loading = ref(true);
+const autoVerify = ref(false); // เปิดระบบตรวจสลิปอัตโนมัติหรือไม่
+const notice = ref(null);       // { type: 'ok' | 'info', text }
 const ui = reactive({}); // fine_id -> { open, qrUrl, qrName, qrErr, qrLoading, file, preview, uploading, msg, err }
 
 const money = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -68,15 +70,19 @@ async function sendSlip(f) {
     const fd = new FormData();
     fd.append('slip', s.file);
     const { data } = await api.post(`/fines/${f.fine_id}/slip`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-    s.msg = data.message;
+    notice.value = { type: data.auto_verified ? 'ok' : 'info', text: data.message };
     delete ui[f.fine_id];
     await load();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (e) {
     s.err = e.response?.data?.message || 'ส่งสลิปไม่สำเร็จ';
   } finally { s.uploading = false; }
 }
 
-onMounted(load);
+onMounted(() => {
+  load();
+  api.get('/fines/config').then((r) => { autoVerify.value = !!r.data.auto_verify; }).catch(() => {});
+});
 </script>
 
 <template>
@@ -87,6 +93,10 @@ onMounted(load);
         <span>ค้างชำระ {{ unpaidCount }} รายการ</span>
         <b>฿{{ money(outstanding) }}</b>
       </div>
+    </div>
+
+    <div v-if="notice" class="notice" :class="notice.type" @click="notice = null">
+      {{ notice.type === 'ok' ? '✅' : '⏳' }} {{ notice.text }}
     </div>
 
     <p v-if="loading" class="empty">กำลังโหลด...</p>
@@ -143,12 +153,15 @@ onMounted(load);
             <div class="step-no">2</div>
             <div class="step-body">
               <b>แนบสลิปการโอนเงิน</b>
-              <p class="hint">รูป jpg, png หรือ webp ขนาดไม่เกิน 5MB</p>
+              <p class="hint">
+                รูป jpg, png หรือ webp ขนาดไม่เกิน 5MB
+                <template v-if="autoVerify"><br />ระบบจะตรวจสลิปให้อัตโนมัติภายในไม่กี่วินาที ถ้าผ่านจะถือว่าชำระแล้วทันที (ควรแนบสลิปเต็มใบที่เห็น QR มุมขวาล่างชัดเจน)</template>
+              </p>
               <input type="file" accept="image/jpeg,image/png,image/webp" @change="onFile(f, $event)" />
               <img v-if="state(f.fine_id).preview" :src="state(f.fine_id).preview" class="preview" alt="ตัวอย่างสลิป" />
               <p v-if="state(f.fine_id).err" class="err">{{ state(f.fine_id).err }}</p>
               <button class="btn send" :disabled="state(f.fine_id).uploading || !state(f.fine_id).file" @click="sendSlip(f)">
-                {{ state(f.fine_id).uploading ? 'กำลังส่ง...' : 'ส่งสลิปให้ผู้ดูแลระบบตรวจสอบ' }}
+                {{ state(f.fine_id).uploading ? (autoVerify ? 'กำลังตรวจสอบสลิป...' : 'กำลังส่ง...') : (autoVerify ? 'ส่งสลิปให้ระบบตรวจสอบ' : 'ส่งสลิปให้ผู้ดูแลระบบตรวจสอบ') }}
               </button>
             </div>
           </div>
@@ -158,7 +171,9 @@ onMounted(load);
       <div v-else-if="f.status === 'slip_submitted'" class="note-wait">
         ⏳ ส่งสลิปเมื่อ {{ f.slip_uploaded_at }} — รอผู้ดูแลระบบตรวจสอบ เมื่อตรวจแล้วจะแจ้งเตือนในระบบและทางอีเมล
       </div>
-      <div v-else-if="f.status === 'paid'" class="note-ok">✅ ชำระเรียบร้อยเมื่อ {{ f.paid_at }}</div>
+      <div v-else-if="f.status === 'paid'" class="note-ok">
+        ✅ ชำระเรียบร้อยเมื่อ {{ f.paid_at }}<template v-if="f.auto_paid"> (ตรวจสอบสลิปอัตโนมัติ)</template>
+      </div>
       <div v-else class="note-cancel">รายการนี้ถูกยกเลิก ไม่ต้องชำระ</div>
     </div>
   </section>
@@ -166,6 +181,9 @@ onMounted(load);
 
 <style scoped>
 .wrap { max-width: 760px; margin: 0 auto; }
+.notice { border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 14px; cursor: pointer; }
+.notice.ok { background: #e3f4ea; color: #1f6b3d; }
+.notice.info { background: #fdf3dc; color: #8a5a00; }
 .head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .head h2 { margin: 0; }
 .sum { display: flex; flex-direction: column; align-items: flex-end; background: #fdecea; color: #8a1c14; padding: 8px 16px; border-radius: 12px; font-size: 13px; }
