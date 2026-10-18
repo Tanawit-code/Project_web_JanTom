@@ -48,6 +48,17 @@ async function sendEmailChangeConfirmation(oldEmail, newEmail, confirmLink) {
   });
 }
 
+async function sendPasswordChangeConfirmation(toEmail, confirmLink) {
+  return sendMail({
+    to: toEmail,
+    subject: 'ยืนยันการเปลี่ยนรหัสผ่านบัญชี',
+    html: `<p>มีคำขอเปลี่ยนรหัสผ่านของบัญชีคุณ หากเป็นคุณ กดปุ่มด้านล่างเพื่อยืนยันภายใน 30 นาที</p>
+           <p><a href="${esc(confirmLink)}" style="background:#2563eb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;">ยืนยันการเปลี่ยนรหัสผ่าน</a></p>
+           <p style="color:#666;font-size:12px;">หากคุณไม่ได้เป็นผู้ขอ โปรดเพิกเฉย รหัสผ่านเดิมจะยังใช้งานได้ และควรเปลี่ยนรหัสผ่านทันทีหากสงสัยว่าบัญชีถูกใช้งานโดยผู้อื่น</p>`,
+    devLog: `Password change confirmation link: ${confirmLink}`,
+  });
+}
+
 // ส่งไปหา admin เมื่อมีคนสมัครใหม่
 async function sendApprovalRequestEmail(applicant, reviewLink) {
   const adminEmail = process.env.ADMIN_EMAIL;
@@ -95,4 +106,4 @@ async function sendNotifyEmail({ to, subject, heading, lines = [], link, linkTex
   return sendMail({ to, subject, html, devLog: `${subject}${link ? ' -> ' + link : ''}` });
 }
 
-module.exports = { sendNotifyEmail, sendResetEmail, sendApprovalRequestEmail, sendRegistrationResultEmail, sendEmailChangeConfirmation };
+module.exports = { sendNotifyEmail, sendResetEmail, sendApprovalRequestEmail, sendRegistrationResultEmail, sendEmailChangeConfirmation, sendPasswordChangeConfirmation };

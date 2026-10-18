@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue';
 import api from '../services/api';
 import { authState } from '../services/auth';
+import PasswordInput from '../components/PasswordInput.vue';
 
 const profile = reactive({ first_name: authState.user?.first_name || '', last_name: authState.user?.last_name || '' });
 const password = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -20,7 +21,10 @@ async function saveProfile() {
     localStorage.setItem('user', JSON.stringify(authState.user));
     password.currentPassword = ''; password.newPassword = ''; password.confirmPassword = '';
     notice.value = data.message;
-  } catch (e) { error.value = e.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ'; }
+  } catch (e) {
+    if (e.response?.data?.user) { Object.assign(authState.user, e.response.data.user); localStorage.setItem('user', JSON.stringify(authState.user)); }
+    error.value = e.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ';
+  }
   finally { busy.value = false; }
 }
 
@@ -44,11 +48,11 @@ async function requestEmailChange() {
       <label>ชื่อ<input v-model="profile.first_name" required maxlength="50"></label>
       <label>นามสกุล<input v-model="profile.last_name" required maxlength="50"></label>
       <h2>เปลี่ยนรหัสผ่าน</h2>
-      <p class="muted">เว้นว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่าน</p>
-      <label>รหัสผ่านเดิม<input v-model="password.currentPassword" type="password" autocomplete="current-password"></label>
-      <label>รหัสผ่านใหม่<input v-model="password.newPassword" type="password" autocomplete="new-password"></label>
+      <p class="muted">เว้นว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่าน หากเปลี่ยน ระบบจะส่งลิงก์ยืนยันไปที่อีเมลของคุณ และรหัสผ่านจะเปลี่ยนเมื่อกดลิงก์เท่านั้น</p>
+      <label>รหัสผ่านเดิม<PasswordInput v-model="password.currentPassword" autocomplete="current-password" /></label>
+      <label>รหัสผ่านใหม่<PasswordInput v-model="password.newPassword" autocomplete="new-password" /></label>
       <small>อย่างน้อย 8 ตัวอักษร และมีตัวพิมพ์เล็ก ตัวพิมพ์ใหญ่ ตัวเลข และอักขระพิเศษ</small>
-      <label>ยืนยันรหัสผ่านใหม่<input v-model="password.confirmPassword" type="password" autocomplete="new-password"></label>
+      <label>ยืนยันรหัสผ่านใหม่<PasswordInput v-model="password.confirmPassword" autocomplete="new-password" /></label>
       <button :disabled="busy">{{ busy ? 'กำลังบันทึก…' : 'บันทึกข้อมูล' }}</button>
     </form>
 
