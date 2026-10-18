@@ -1,18 +1,8 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
-const uploadDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, unique);
-  },
-});
+// เก็บไฟล์ไว้ใน memory ชั่วคราว แล้วให้ route ส่งต่อไป Cloudinary (หรือบันทึกลงดิสก์ถ้ายังไม่ได้ตั้งค่า)
+const storage = multer.memoryStorage();
 
 const ALLOWED = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
 

@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { saveImage } = require('../utils/imageStorage');
 const { bangkokToday, isValidCeDate } = require('../utils/dates');
 
 const BAD_PURCHASE_DATE = 'วันที่ซื้อไม่ถูกต้อง (ต้องเป็นปี ค.ศ. และไม่เกินวันนี้ เช่น 2025-06-10)';
@@ -29,11 +30,16 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 // Admin-only: upload an image for an asset. Returns a URL to store as image_url.
 router.post('/upload', requireAuth, requireRole('admin'), (req, res) => {
-  upload.single('image')(req, res, (err) => {
+  upload.single('image')(req, res, async (err) => {
     if (err) return res.status(400).json({ message: err.message || 'อัปโหลดไฟล์ไม่สำเร็จ' });
     if (!req.file) return res.status(400).json({ message: 'กรุณาเลือกไฟล์รูปภาพ' });
-    const image_url = `/uploads/${req.file.filename}`;
-    res.status(201).json({ image_url });
+    try {
+      const image_url = await saveImage(req.file); // URL เต็มของ Cloudinary หรือ /uploads/xxx
+      res.status(201).json({ image_url });
+    } catch (e) {
+      console.error('[upload]', e.message);
+      res.status(500).json({ message: 'อัปโหลดรูปภาพไม่สำเร็จ' });
+    }
   });
 });
 
