@@ -39,6 +39,15 @@ async function sendResetEmail(toEmail, resetLink) {
   });
 }
 
+async function sendEmailChangeConfirmation(oldEmail, newEmail, confirmLink) {
+  return sendMail({
+    to: oldEmail,
+    subject: 'ยืนยันการเปลี่ยนอีเมลบัญชี',
+    html: `<p>มีคำขอเปลี่ยนอีเมลบัญชีของคุณเป็น <b>${esc(newEmail)}</b></p><p>หากเป็นคุณ ให้ยืนยันภายใน 30 นาที:</p><p><a href="${esc(confirmLink)}">ยืนยันการเปลี่ยนอีเมล</a></p><p>หากคุณไม่ได้เป็นผู้ขอ โปรดเพิกเฉย อีเมลเดิมจะยังคงใช้งานได้</p>`,
+    devLog: `Email change confirmation link: ${confirmLink}`,
+  });
+}
+
 // ส่งไปหา admin เมื่อมีคนสมัครใหม่
 async function sendApprovalRequestEmail(applicant, reviewLink) {
   const adminEmail = process.env.ADMIN_EMAIL;
@@ -86,4 +95,4 @@ async function sendNotifyEmail({ to, subject, heading, lines = [], link, linkTex
   return sendMail({ to, subject, html, devLog: `${subject}${link ? ' -> ' + link : ''}` });
 }
 
-module.exports = { sendNotifyEmail, sendResetEmail, sendApprovalRequestEmail, sendRegistrationResultEmail };
+module.exports = { sendNotifyEmail, sendResetEmail, sendApprovalRequestEmail, sendRegistrationResultEmail, sendEmailChangeConfirmation };
