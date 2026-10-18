@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 18, 2026 at 12:44 PM
+-- Generation Time: Oct 18, 2026 at 01:42 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -51,7 +51,50 @@ INSERT INTO `asset` (`asset_id`, `asset_code`, `asset_name`, `brand`, `model`, `
 (2, 'AST-0002', 'โปรเจกเตอร์ Epson', 'Epson', 'EB-X06', 'SN-EPX06-01', '2023-11-13', 15000.00, 'available', 'ห้องประชุม A', '/uploads/1791258881414-56004592.jpg', 2),
 (3, 'AST-0003', 'กล้องถ่ายภาพ Canon', 'Canon', 'EOS 200D', 'SN-EOS-01', '2024-01-18', 22000.00, 'available', 'คลังไอที', '/uploads/1791259121562-646489660.webp', 1),
 (4, 'AST-0004', 'สว่านไฟฟ้า Bosch', 'Bosch', 'GSB 13RE', 'SN-BOSCH-01', '2022-06-09', 3500.00, 'available', 'ห้องช่าง', '/uploads/1791258701640-381870041.jpg', 3),
-(5, 'AST-0005', 'ไมค์ BOYA', 'BOYA', 'V2.0', 'SN-005', '2026-06-10', 2000.00, 'available', 'ครังไอที', '/uploads/1791260410747-539846236.jpg', 2);
+(5, 'AST-0005', 'ไมค์ BOYA', 'BOYA', 'V2.0', 'SN-005', '2026-06-10', 2000.00, 'available', 'ครังไอที', '/uploads/1791260410747-539846236.jpg', 2),
+(7, 'AST-0006', 'โน้ตบุ๊ก Lenovo ThinkPad 2', 'Lenovo', 'ThinkPad E14 Gen 5', 'SN-LNV-E14-01', '2024-05-20', 26900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323372/assets/aqyj21tiapcbunf9zdrl.jpg', 1),
+(8, 'AST-0007', 'โน้ตบุ๊ก Lenovo ThinkPad', 'Lenovo', 'ThinkPad E14 Gen 5', 'SN-LNV-E14-02', '2024-05-20', 26900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323326/assets/pex4geeik2afu0qxlmd6.jpg', 1),
+(9, 'AST-0008', 'โน้ตบุ๊ก HP ProBook', 'HP', 'ProBook 440 G10', 'SN-HP-440-01', '2024-08-12', 24500.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323337/assets/xx1lalsodqvehudoezjp.jpg', 1),
+(10, 'AST-0009', 'โน้ตบุ๊ก ASUS Vivobook', 'ASUS', 'Vivobook 15 X1504', 'SN-ASUS-V15-01', '2025-02-10', 18900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323276/assets/xybxs4rthmolagxzoq6c.jpg', 1),
+(11, 'AST-0010', 'MacBook Air 13 นิ้ว', 'Apple', 'MacBook Air M2', 'SN-APL-MBA-01', '2024-03-15', 37900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323248/assets/avfghp1mykodxfmpfbtd.jpg', 1),
+(12, 'AST-0011', 'คอมพิวเตอร์ตั้งโต๊ะ Dell OptiPlex', 'Dell', 'OptiPlex 3000', 'SN-DELL-OP3K-01', '2023-09-05', 19500.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323229/assets/ksizi8jzxqrnzdahmznk.jpg', 1),
+(13, 'AST-0012', 'โปรเจกเตอร์ BenQ', 'BenQ', 'MH560', 'SN-BNQ-MH560-01', '2024-04-02', 17900.00, 'available', 'ห้องประชุม B', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323205/assets/yncgu3h3sodnlwwdgnn6.png', 2),
+(14, 'AST-0013', 'จอโปรเจกเตอร์ ขาตั้ง 100 นิ้ว', 'Telon', 'Tripod 100\"', 'SN-TLN-100-01', '2023-07-18', 3200.00, 'available', 'ห้องประชุม A', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323176/assets/ugc4mmqop7pe91gnfzj1.jpg', 2),
+(15, 'AST-0014', 'ลำโพงประชุมไร้สาย', 'Jabra', 'Speak 510', 'SN-JBR-S510-01', '2024-01-22', 5900.00, 'available', 'ห้องประชุม A', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323156/assets/q6nftvms8nhdlllysvzf.jpg', 2),
+(16, 'AST-0015', 'ตัวควบคุมสไลด์ (Presenter)', 'Logitech', 'R400', 'SN-LGT-R400-01', '2023-10-09', 1200.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323136/assets/oqiocppdathoux9fjyvy.jpg', 2),
+(17, 'AST-0016', 'จอทีวีสำหรับประชุม 55 นิ้ว', 'Samsung', 'UA55CU7700', 'SN-SSG-55-01', '2024-06-30', 14900.00, 'available', 'ห้องประชุม B', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323121/assets/ntkip6soiu7zelexhoam.jpg', 2),
+(18, 'AST-0017', 'เครื่องพิมพ์เลเซอร์ HP', 'HP', 'LaserJet Pro M404dn', 'SN-HP-M404-01', '2023-05-14', 9900.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323098/assets/vcqtepshzesawqhwktlf.jpg', 4),
+(19, 'AST-0018', 'เครื่องพิมพ์ Brother อเนกประสงค์', 'Brother', 'MFC-L2750DW', 'SN-BRO-L2750-01', '2024-02-08', 8500.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323077/assets/qgrvmnm1qa9yuoq3oz81.jpg', 4),
+(20, 'AST-0019', 'สแกนเนอร์เอกสาร', 'Epson', 'WorkForce DS-530II', 'SN-EPS-DS530-01', '2023-12-01', 13900.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323056/assets/okbiw306yvkg00ynrets.jpg', 4),
+(21, 'AST-0020', 'เครื่องเย็บกระดาษแบบอุตสาหกรรม', 'Max', 'HD-12N', 'SN-MAX-HD12-01', '2022-11-21', 650.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323035/assets/nu9pjpxv81yj6drr7bdz.jpg', 4),
+(22, 'AST-0021', 'เครื่องเคลือบบัตร A3', 'Fellowes', 'Neptune 3 A3', 'SN-FLW-NEP3-01', '2023-03-27', 4200.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323019/assets/yfrlyjnqmuid728jhbna.jpg', 4),
+(23, 'AST-0022', 'เราเตอร์ Wi-Fi 6', 'TP-Link', 'Archer AX55', 'SN-TPL-AX55-01', '2024-07-11', 2900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322992/assets/obqkiwpit1habqhaxukm.jpg', 5),
+(24, 'AST-0023', 'สวิตช์ 24 พอร์ต', 'Cisco', 'CBS110-24T', 'SN-CSC-110-01', '2023-08-19', 6900.00, 'available', 'ห้องเซิร์ฟเวอร์', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322975/assets/pc7gdsshpu578jcwh20s.jpg', 5),
+(25, 'AST-0024', 'แอคเซสพอยต์', 'Ubiquiti', 'UniFi U6-Lite', 'SN-UBQ-U6L-01', '2024-09-03', 3500.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322960/assets/vhwvqcrhklsxyv1tgiwu.png', 5),
+(26, 'AST-0025', 'เครื่องทดสอบสายแลน', 'Fluke', 'MicroScanner2', 'SN-FLK-MS2-01', '2022-10-10', 15500.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322945/assets/bpf7hz8scxzhiwbap80s.jpg', 9),
+(27, 'AST-0026', 'กล้อง Mirrorless Sony', 'Sony', 'Alpha a6400', 'SN-SNY-A6400-01', '2024-03-09', 32900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322926/assets/orvalhmyjww2koyknuc8.jpg', 6),
+(28, 'AST-0027', 'กล้อง GoPro Action Camera', 'GoPro', 'HERO12 Black', 'SN-GPR-H12-01', '2024-10-15', 13500.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322899/assets/or6cgblcwvnw64gcqtu3.jpg', 6),
+(29, 'AST-0028', 'ขาตั้งกล้อง', 'Manfrotto', 'MT190X3', 'SN-MFT-190-01', '2023-06-06', 4800.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322849/assets/fxq5bel55eetbkstexyg.jpg', 6),
+(31, 'AST-0030', 'ไฟสตูดิโอ LED', 'Godox', 'SL60W', 'SN-GDX-SL60-01', '2023-11-25', 4500.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322825/assets/zgbkjpd7yo5ca3kepler.jpg', 6),
+(32, 'AST-0031', 'iPad สำหรับใช้งานนอกสถานที่', 'Apple', 'iPad 10th Gen', 'SN-APL-IPD-01', '2024-01-12', 12900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322802/assets/hjf4cg2hirrrftltfrdj.jpg', 7),
+(35, 'AST-0034', 'จอภาพ 24 นิ้ว', 'Dell', 'P2422H', 'SN-DELL-P2422-01', '2023-09-05', 5900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322758/assets/jdvtybicqfxg0waa7sgi.jpg', 8),
+(36, 'AST-0035', 'จอภาพ 27 นิ้ว', 'LG', '27UL500', 'SN-LG-27UL-01', '2024-02-14', 8900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322732/assets/uhsiunmghxdkoqss1hzt.jpg', 8),
+(38, 'AST-0037', 'คีย์บอร์ดและเมาส์ไร้สาย', 'Logitech', 'MK270', 'SN-LGT-MK270-01', '2024-01-08', 650.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322689/assets/bd3fbnynrgtb8bjk5voc.jpg', 8),
+(39, 'AST-0038', 'เว็บแคม Full HD', 'Logitech', 'C920', 'SN-LGT-C920-01', '2023-10-17', 2400.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322657/assets/rtpjlelj4mmlb3iqsng7.png', 8),
+(40, 'AST-0039', 'ชุดไขควงอเนกประสงค์', 'Wiha', 'Precision 31 pcs', 'SN-WHA-31-01', '2023-04-12', 1800.00, 'available', 'ห้องช่าง', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322670/assets/vgbwuipjdxvpoomcy7mf.jpg', 3),
+(41, 'AST-0040', 'เครื่องเจียร์ไฟฟ้า', 'Makita', '9553NB', 'SN-MKT-9553-01', '2022-08-23', 2100.00, 'available', 'ห้องช่าง', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322544/assets/rt0fjosop67ygxkszp32.jpg', 3),
+(42, 'AST-0041', 'บันไดอลูมิเนียมพับได้', 'Gold Series', 'GS-4x4', 'SN-GLD-LDR-01', '2022-05-16', 3900.00, 'available', 'ห้องช่าง', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322527/assets/ax4tkvn8eyg8tesxv1gm.jpg', 3),
+(44, 'AST-0043', 'มัลติมิเตอร์ดิจิทัล', 'Fluke', '117', 'SN-FLK-117-01', '2022-12-05', 7500.00, 'available', 'ห้องช่าง', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322468/assets/e2m05tycifsiqe2uhhks.jpg', 9),
+(45, 'AST-0044', 'เครื่องวัดระยะเลเซอร์', 'Bosch', 'GLM 40', 'SN-BSH-GLM40-01', '2023-02-20', 2500.00, 'available', 'ห้องช่าง', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322412/assets/irrjwfxtq0aokzsxyjo0.jpg', 9),
+(46, 'AST-0045', 'รถยนต์ส่วนกลาง', 'Toyota', 'Corolla Altis 1.8', 'SN-TYT-ALT-01', '2023-01-10', 850000.00, 'available', 'ลานจอดรถ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322402/assets/j8rd89ecel27r4pl0upl.jpg', 10),
+(47, 'AST-0046', 'รถกระบะส่วนกลาง', 'Isuzu', 'D-Max Hi-Lander', 'SN-ISZ-DMX-01', '2022-09-01', 720000.00, 'available', 'ลานจอดรถ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322386/assets/ov9vmamagvn9ndhx1qrs.jpg', 10),
+(48, 'AST-0047', 'รถจักรยานยนต์ส่งเอกสาร', 'Honda', 'Wave 125i', 'SN-HND-W125-01', '2023-04-04', 45000.00, 'available', 'ลานจอดรถ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322377/assets/kdwj80yeqq3tfoifmeml.jpg', 10),
+(49, 'AST-0048', 'ชุดปฐมพยาบาลพกพา', 'Safety Plus', 'FA-Box M', 'SN-SFP-FA-01', '2024-01-05', 1500.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322245/assets/cymiqsvci3ajgih5ysdd.jpg', 11),
+(50, 'AST-0049', 'หมวกนิรภัย (ชุด 5 ใบ)', '3M', 'H-700', 'SN-3M-H700-01', '2023-08-08', 2500.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322239/assets/tbbvtqekeldtscs6xhnc.jpg', 11),
+(51, 'AST-0050', 'เต็นท์พับ 3x3 เมตร', 'Sport Pro', 'Easy-Up 3x3', 'SN-SPP-T33-01', '2023-11-03', 3900.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322230/assets/syly4czb3naov6wzxvva.jpg', 12),
+(52, 'AST-0051', 'โต๊ะพับอเนกประสงค์ 180 ซม.', 'Index', 'FT-180', 'SN-IDX-FT180-01', '2023-05-22', 1900.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323414/assets/jgbagtkamsrlk5dr3fma.jpg', 12),
+(53, 'AST-0052', 'เก้าอี้พับ (ชุด 10 ตัว)', 'Index', 'FC-10', 'SN-IDX-FC10-01', '2023-05-22', 4500.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322114/assets/raxwo4erndlbt58wgqxu.jpg', 12),
+(54, 'AST-0053', 'ป้ายไวนิลขาตั้ง X-Stand', 'Generic', 'X-Stand 60x160', 'SN-XST-01', '2024-02-27', 600.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322088/assets/izxd7zjkljgr22rsgjvc.jpg', 12);
 
 -- --------------------------------------------------------
 
@@ -72,7 +115,16 @@ CREATE TABLE `asset_category` (
 INSERT INTO `asset_category` (`cat_id`, `cat_name`, `description`) VALUES
 (1, 'คอมพิวเตอร์/โน้ตบุ๊ก', 'อุปกรณ์คอมพิวเตอร์'),
 (2, 'อุปกรณ์นำเสนอ', 'โปรเจกเตอร์ จอ ลำโพง'),
-(3, 'เครื่องมือช่าง', 'อุปกรณ์ซ่อมบำรุงทั่วไป');
+(3, 'เครื่องมือช่าง', 'อุปกรณ์ซ่อมบำรุงทั่วไป'),
+(4, 'อุปกรณ์สำนักงาน', 'เครื่องพิมพ์ สแกนเนอร์ เครื่องเย็บกระดาษ อุปกรณ์ใช้งานในสำนักงาน'),
+(5, 'อุปกรณ์เครือข่าย', 'เราเตอร์ สวิตช์ แอคเซสพอยต์ และอุปกรณ์สื่อสารข้อมูล'),
+(6, 'กล้องและงานภาพ/เสียง', 'กล้อง ไมโครโฟน ขาตั้ง และอุปกรณ์ผลิตสื่อ'),
+(7, 'มือถือ/แท็บเล็ต', 'สมาร์ตโฟนและแท็บเล็ตสำหรับใช้งานนอกสถานที่'),
+(8, 'อุปกรณ์ต่อพ่วงคอมพิวเตอร์', 'จอภาพ คีย์บอร์ด เมาส์ ฮาร์ดดิสก์ภายนอก อุปกรณ์เสริม'),
+(9, 'เครื่องมือวัดและทดสอบ', 'มัลติมิเตอร์ เครื่องวัดระยะ เครื่องทดสอบสายแลน'),
+(10, 'ยานพาหนะ', 'รถยนต์และรถจักรยานยนต์ของบริษัท'),
+(11, 'อุปกรณ์ความปลอดภัย', 'หมวกนิรภัย ชุดปฐมพยาบาล อุปกรณ์ป้องกันส่วนบุคคล'),
+(12, 'อุปกรณ์จัดงาน/กิจกรรม', 'เต็นท์ โต๊ะพับ เก้าอี้ ป้ายและอุปกรณ์จัดอีเวนต์');
 
 -- --------------------------------------------------------
 
@@ -193,20 +245,23 @@ CREATE TABLE `employee` (
   `dept_id` int(11) DEFAULT NULL,
   `pending_email` varchar(100) DEFAULT NULL,
   `email_change_token_hash` char(64) DEFAULT NULL,
-  `email_change_expires` datetime DEFAULT NULL
+  `email_change_expires` datetime DEFAULT NULL,
+  `pending_password_hash` varchar(255) DEFAULT NULL,
+  `password_change_token_hash` char(64) DEFAULT NULL,
+  `password_change_expires` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `employee`
 --
 
-INSERT INTO `employee` (`emp_id`, `emp_code`, `first_name`, `last_name`, `position`, `phone`, `email`, `username`, `password_hash`, `role`, `status`, `approval_token_hash`, `approval_expires`, `reset_token_hash`, `reset_expires`, `created_at`, `dept_id`, `pending_email`, `email_change_token_hash`, `email_change_expires`) VALUES
-(1, 'ADM-0001', 'ผู้ดูแล', 'ระบบ', NULL, NULL, NULL, 'admin', '$2a$10$AqpEEHr.lu7FurUEDPNWP.yADb/PwqSl7IURpNgWWvRB9Lypor18S', 'admin', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', NULL, NULL, NULL, NULL),
-(2, '001', 'tanawit', 'chawprakan', 'it', '123456', 'tanawit@gmail.com', 'tanawit', '$2a$10$CW95ZvuwfMaesAVBZT4t8OLmbDWT4eDECht2h8i8bGz0g8ojwn6d6', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, NULL, NULL, NULL),
-(4, 'EMP-0001', 'tanawit', 'chawprakan', 'it', '123456', 'tanawit-it@gmail.com', 'tanawit_it', '$2a$10$25DBN1gkBF3anjR3QsUj9uYaxSQtvJtlvdwDJxXcHQPYNcDKfaGTq', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, NULL, NULL, NULL),
-(5, 'EMP-0002', 'Teerapat', 'poom', 'it', '123456789', 'teerapat@gmail.com', 'teerapat', '$2a$10$VVqtb.P5x6T8Twxax8Kb0.LuhmZtxpkMdW2d69AKlwZG4FR/9S116', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, 'hajungbungphoo@gmail.com', '141a96557d9ebf9db3e8f0bd6cc64420f59f08efd910c91ce608de9a6c34f8a1', '2026-10-18 18:03:53'),
-(6, 'EMP-0003', 'Natapat', 'natt', 'it', '1234567', 'Natapat@gmail.com', 'Natapat', '$2a$10$4qJZJhwzc6RXpWnXOAPK8eDazEpfmEag1hhfF6CzEm.1eTvz8L9ZC', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, NULL, NULL, NULL),
-(13, '00067', 'weera', 'weeradon', NULL, NULL, 'hajungbungphoo@gmail.com', 'weeradon', '$2a$10$0wlF2CyHtZzbvUGc1V/BYejWvwK39CAlBUBf/D6k21/oASmALuLn6', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-11 19:41:17', NULL, NULL, NULL, NULL);
+INSERT INTO `employee` (`emp_id`, `emp_code`, `first_name`, `last_name`, `position`, `phone`, `email`, `username`, `password_hash`, `role`, `status`, `approval_token_hash`, `approval_expires`, `reset_token_hash`, `reset_expires`, `created_at`, `dept_id`, `pending_email`, `email_change_token_hash`, `email_change_expires`, `pending_password_hash`, `password_change_token_hash`, `password_change_expires`) VALUES
+(1, 'ADM-0001', 'ผู้ดูแล', 'ระบบ', NULL, NULL, NULL, 'admin', '$2a$10$AqpEEHr.lu7FurUEDPNWP.yADb/PwqSl7IURpNgWWvRB9Lypor18S', 'admin', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(2, '001', 'tanawit', 'chawprakan', 'it', '123456', 'tanawit@gmail.com', 'tanawit', '$2a$10$CW95ZvuwfMaesAVBZT4t8OLmbDWT4eDECht2h8i8bGz0g8ojwn6d6', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+(4, 'EMP-0001', 'tanawit', 'chawprakan', 'it', '123456', 'tanawit-it@gmail.com', 'tanawit_it', '$2a$10$25DBN1gkBF3anjR3QsUj9uYaxSQtvJtlvdwDJxXcHQPYNcDKfaGTq', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+(5, 'EMP-0002', 'Teerapat', 'poom', 'it', '123456789', 'teerapat@gmail.com', 'teerapat', '$2a$10$VVqtb.P5x6T8Twxax8Kb0.LuhmZtxpkMdW2d69AKlwZG4FR/9S116', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, 'hajungbungphoo@gmail.com', '141a96557d9ebf9db3e8f0bd6cc64420f59f08efd910c91ce608de9a6c34f8a1', '2026-10-18 18:03:53', NULL, NULL, NULL),
+(6, 'EMP-0003', 'Natapat', 'natt', 'it', '1234567', 'Natapat@gmail.com', 'Natapat', '$2a$10$4qJZJhwzc6RXpWnXOAPK8eDazEpfmEag1hhfF6CzEm.1eTvz8L9ZC', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-09 00:52:36', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+(13, '00067', 'weera', 'weeradon', NULL, NULL, 'hajungbungphoo@gmail.com', 'weeradon', '$2a$10$BZTW4TdcHylQ7iKx4GQwVOs6o8euQfeA9ST7Z9v5hRSb3vtNKBdh6', 'employee', 'active', NULL, NULL, NULL, NULL, '2026-10-11 19:41:17', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -451,13 +506,13 @@ ALTER TABLE `return_record`
 -- AUTO_INCREMENT for table `asset`
 --
 ALTER TABLE `asset`
-  MODIFY `asset_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `asset_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=103;
 
 --
 -- AUTO_INCREMENT for table `asset_category`
 --
 ALTER TABLE `asset_category`
-  MODIFY `cat_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `cat_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `borrow_detail`
