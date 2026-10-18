@@ -1,70 +1,121 @@
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed, onMounted } from 'vue';
 import api from '../services/api';
 import { authState } from '../services/auth';
 import PasswordInput from '../components/PasswordInput.vue';
 
-const profile = reactive({ first_name: authState.user?.first_name || '', last_name: authState.user?.last_name || '' });
+const me = ref(null);
 const password = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const email = ref('');
-const busy = ref(false);
+const busy = ref('');
 const error = ref('');
 const notice = ref('');
 
-async function saveProfile() {
-  error.value = ''; notice.value = '';
-  if (password.newPassword && password.newPassword !== password.confirmPassword) { error.value = 'รหัสผ่านใหม่ไม่ตรงกัน'; return; }
-  busy.value = true;
+const fullName = computed(() => (me.value ? `${me.value.first_name} ${me.value.last_name}` : `${authState.user?.first_name || ''} ${authState.user?.last_name || ''}`.trim()));
+const currentEmail = computed(() => me.value?.email || authState.user?.email || '');
+
+onMounted(async () => {
   try {
-    const { data } = await api.patch('/auth/profile', { ...profile, currentPassword: password.currentPassword, newPassword: password.newPassword });
-    Object.assign(authState.user, data.user);
-    localStorage.setItem('user', JSON.stringify(authState.user));
+    me.value = (await api.get('/auth/profile')).data;
+    if (authState.user && me.value.email !== authState.user.email) {
+      authState.user.email = me.value.email;
+      localStorage.setItem('user', JSON.stringify(authState.user));
+    }
+  } catch { /* ใช้ข้อมูลจาก session แทน */ }
+});
+
+async function changePassword() {
+  error.value = ''; notice.value = '';
+  if (password.newPassword !== password.confirmPassword) { error.value = 'รหัสผ่านใหม่ไม่ตรงกัน'; return; }
+  busy.value = 'password';
+  try {
+    const { data } = await api.patch('/auth/profile', { currentPassword: password.currentPassword, newPassword: password.newPassword });
     password.currentPassword = ''; password.newPassword = ''; password.confirmPassword = '';
     notice.value = data.message;
-  } catch (e) {
-    if (e.response?.data?.user) { Object.assign(authState.user, e.response.data.user); localStorage.setItem('user', JSON.stringify(authState.user)); }
-    error.value = e.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ';
-  }
-  finally { busy.value = false; }
+  } catch (e) { error.value = e.response?.data?.message || 'เปลี่ยนรหัสผ่านไม่สำเร็จ'; }
+  finally { busy.value = ''; }
 }
 
 async function requestEmailChange() {
-  error.value = ''; notice.value = ''; busy.value = true;
-  try { notice.value = (await api.post('/auth/profile/email-change', { email: email.value })).data.message; email.value = ''; }
-  catch (e) { error.value = e.response?.data?.message || 'ส่งคำขอไม่สำเร็จ'; }
-  finally { busy.value = false; }
+  error.value = ''; notice.value = ''; busy.value = 'email';
+  try {
+    notice.value = (await api.post('/auth/profile/email-change', { email: email.value })).data.message;
+    email.value = '';
+  } catch (e) { error.value = e.response?.data?.message || 'ส่งคำขอไม่สำเร็จ'; }
+  finally { busy.value = ''; }
 }
 </script>
 
 <template>
-  <section class="profile-card">
-    <h1>จัดการบัญชี</h1>
-    <p class="muted">แก้ไขชื่อ รหัสผ่าน และอีเมลของคุณ</p>
-    <div v-if="error" class="alert">{{ error }}</div>
-    <div v-if="notice" class="success">{{ notice }}</div>
+  <section class="page narrow">
+    <div class="page-head">
+      <div>
+        <h2>จัดการบัญชี</h2>
+        <p class="page-sub">ดูข้อมูลของคุณ เปลี่ยนรหัสผ่าน และเปลี่ยนอีเมล</p>
+      </div>
+    </div>
 
-    <form @submit.prevent="saveProfile">
-      <h2>ข้อมูลส่วนตัว</h2>
-      <label>ชื่อ<input v-model="profile.first_name" required maxlength="50"></label>
-      <label>นามสกุล<input v-model="profile.last_name" required maxlength="50"></label>
-      <h2>เปลี่ยนรหัสผ่าน</h2>
-      <p class="muted">เว้นว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่าน หากเปลี่ยน ระบบจะส่งลิงก์ยืนยันไปที่อีเมลของคุณ และรหัสผ่านจะเปลี่ยนเมื่อกดลิงก์เท่านั้น</p>
-      <label>รหัสผ่านเดิม<PasswordInput v-model="password.currentPassword" autocomplete="current-password" /></label>
-      <label>รหัสผ่านใหม่<PasswordInput v-model="password.newPassword" autocomplete="new-password" /></label>
-      <small>อย่างน้อย 8 ตัวอักษร และมีตัวพิมพ์เล็ก ตัวพิมพ์ใหญ่ ตัวเลข และอักขระพิเศษ</small>
-      <label>ยืนยันรหัสผ่านใหม่<PasswordInput v-model="password.confirmPassword" autocomplete="new-password" /></label>
-      <button :disabled="busy">{{ busy ? 'กำลังบันทึก…' : 'บันทึกข้อมูล' }}</button>
+    <p v-if="error" class="error-text">{{ error }}</p>
+    <p v-if="notice" class="success-text">{{ notice }}</p>
+
+    <!-- ข้อมูลส่วนตัว (อ่านอย่างเดียว) -->
+    <div class="card block">
+      <div class="who">
+        <span class="avatar big">{{ (fullName || '?').charAt(0).toUpperCase() }}</span>
+        <div>
+          <b class="name">{{ fullName }}</b>
+          <small v-if="me?.emp_code">รหัสพนักงาน {{ me.emp_code }}<template v-if="me.position"> · {{ me.position }}</template></small>
+        </div>
+      </div>
+      <dl class="info">
+        <div><dt>ชื่อ-นามสกุล</dt><dd>{{ fullName }}</dd></div>
+        <div><dt>อีเมลที่ใช้อยู่</dt><dd>{{ currentEmail || 'ยังไม่ได้ระบุ' }}</dd></div>
+      </dl>
+      <p class="hint">ชื่อ-นามสกุลเปลี่ยนเองไม่ได้ หากต้องการแก้ไขให้ติดต่อผู้ดูแลระบบ</p>
+    </div>
+
+    <!-- เปลี่ยนรหัสผ่าน -->
+    <form class="card block" autocomplete="off" @submit.prevent="changePassword">
+      <h3 class="section-title">เปลี่ยนรหัสผ่าน</h3>
+      <p class="hint steps">กรอกรหัสผ่านเดิมและรหัสใหม่ จากนั้นระบบจะส่งลิงก์ยืนยันไปที่ <b>{{ currentEmail || 'อีเมลของคุณ' }}</b> รหัสผ่านจะเปลี่ยนเมื่อกดลิงก์ในอีเมลเท่านั้น</p>
+      <div class="stack">
+        <label class="field"><span>รหัสผ่านเดิม</span><PasswordInput v-model="password.currentPassword" autocomplete="current-password" /></label>
+        <label class="field"><span>รหัสผ่านใหม่</span><PasswordInput v-model="password.newPassword" autocomplete="new-password" />
+          <small>อย่างน้อย 8 ตัวอักษร มีตัวพิมพ์เล็ก ตัวพิมพ์ใหญ่ ตัวเลข และอักขระพิเศษ</small></label>
+        <label class="field"><span>ยืนยันรหัสผ่านใหม่</span><PasswordInput v-model="password.confirmPassword" autocomplete="new-password" /></label>
+      </div>
+      <div class="form-actions">
+        <button class="btn" :disabled="busy === 'password' || !password.currentPassword || !password.newPassword">
+          {{ busy === 'password' ? 'กำลังส่งอีเมล…' : 'ส่งลิงก์ยืนยันการเปลี่ยนรหัสผ่าน' }}
+        </button>
+      </div>
     </form>
 
-    <form class="email-form" @submit.prevent="requestEmailChange">
-      <h2>เปลี่ยนอีเมล</h2>
-      <p class="muted">อีเมลปัจจุบัน: {{ authState.user?.email || 'ยังไม่ได้ระบุ' }}. เราจะส่งลิงก์ยืนยันไปยังอีเมลปัจจุบัน</p>
-      <label>อีเมลใหม่<input v-model="email" type="email" required maxlength="100" autocomplete="email"></label>
-      <button :disabled="busy">ส่งลิงก์ยืนยัน</button>
+    <!-- เปลี่ยนอีเมล -->
+    <form class="card block" autocomplete="off" @submit.prevent="requestEmailChange">
+      <h3 class="section-title">เปลี่ยนอีเมล</h3>
+      <p class="hint steps">ระบบจะส่งลิงก์ยืนยันไปที่อีเมลปัจจุบัน <b>{{ currentEmail || '(ยังไม่ได้ระบุ)' }}</b> อีเมลจะเปลี่ยนเมื่อกดลิงก์ยืนยัน</p>
+      <label class="field"><span>อีเมลใหม่</span><input v-model="email" type="email" required maxlength="100" autocomplete="off" placeholder="name@company.com" style="margin:0" /></label>
+      <div class="form-actions" style="margin-top:14px;">
+        <button class="btn" :disabled="busy === 'email' || !email">{{ busy === 'email' ? 'กำลังส่ง…' : 'ส่งลิงก์ยืนยัน' }}</button>
+      </div>
     </form>
   </section>
 </template>
 
 <style scoped>
-.profile-card{max-width:620px;margin:24px auto;background:#fff;padding:30px;border-radius:18px;box-shadow:0 8px 30px #18324b12}h1{margin:0 0 6px}h2{font-size:18px;margin:24px 0 12px}.muted,small{color:var(--muted);line-height:1.6}.profile-card form{display:grid;gap:12px}.profile-card label{display:grid;gap:6px;font-size:14px;font-weight:600}.profile-card input{padding:11px 12px;border:1px solid #d8dee8;border-radius:9px;font:inherit}.profile-card button{border:0;border-radius:9px;padding:12px;background:var(--primary);color:#fff;font:inherit;font-weight:600;cursor:pointer}.profile-card button:disabled{opacity:.6}.email-form{border-top:1px solid #e8ebf0;margin-top:28px;padding-top:8px}.alert,.success{padding:11px 14px;border-radius:9px;margin:12px 0}.alert{background:#fbe7e4;color:#a93226}.success{background:#e3f4ea;color:#176b3a}
+.block { margin-bottom: 18px; }
+.who { display: flex; align-items: center; gap: 14px; }
+.who > div { display: flex; flex-direction: column; }
+.avatar.big { width: 56px; height: 56px; flex-basis: 56px; font-size: 22px; }
+.name { font-size: 18px; }
+small { color: var(--muted); font-size: 12.5px; }
+.info { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 18px 0 10px; }
+.info div { background: #f6f8fc; border-radius: 10px; padding: 10px 14px; }
+dt { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+dd { margin: 0; font-weight: 600; font-size: 14.5px; overflow-wrap: anywhere; }
+.steps { margin: -6px 0 16px; line-height: 1.6; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.stack .field :deep(input) { margin: 0; }
+.form-actions { margin-top: 18px; }
 </style>
