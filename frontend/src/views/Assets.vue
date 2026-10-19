@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import api from '../services/api';
 
-const allAssets = ref([]); // ทรัพย์สินที่ว่างทั้งหมด กรองฝั่งหน้าเว็บให้ตอบสนองทันที
+const allAssets = ref([]); // แสดงทั้งทรัพย์สินพร้อมให้ยืมและทรัพย์สินที่กำลังซ่อม
 const sortBy = ref('name');
 const categories = ref([]);
 const activeCat = ref('');
@@ -30,10 +30,16 @@ const dueDateText = computed(() => fmt(new Date(Date.now() + days.value * 864000
 async function load() {
   loading.value = true;
   try {
-    const { data } = await api.get('/assets', { params: { status: 'available' } });
-    allAssets.value = data;
+    const { data } = await api.get('/assets');
+    // แสดงเฉพาะทรัพย์สินที่พร้อมให้ยืมและที่กำลังซ่อม ส่วนสถานะอื่นไม่แสดงในหน้านี้
+    allAssets.value = data.filter((a) => ['available', 'repair'].includes(a.status));
+    // ถ้าทรัพย์สินที่ถูกเลือกเปลี่ยนสถานะเป็นซ่อม ให้เอาออกจากรายการที่เลือกทันที
+    selected.value = selected.value.filter((picked) => allAssets.value.some((a) => a.asset_id === picked.asset_id && a.status === 'available'));
   } finally { loading.value = false; }
 }
+
+const repairAssets = computed(() => searched.value.filter((a) => a.status === 'repair'));
+const borrowableAssets = computed(() => searched.value.filter((a) => a.status === 'available'));
 
 const GENERAL = 'ทั่วไป';
 const catOf = (a) => a.cat_name || GENERAL;
@@ -80,6 +86,7 @@ function pickCat(id) { activeCat.value = id; }
 
 const isSelected = (id) => selected.value.some((a) => a.asset_id === id);
 function toggle(a) {
+  if (a.status !== 'available') return;
   const i = selected.value.findIndex((x) => x.asset_id === a.asset_id);
   if (i === -1) selected.value.push({ asset_id: a.asset_id, asset_name: a.asset_name, asset_code: a.asset_code }); else selected.value.splice(i, 1);
 }
@@ -111,6 +118,11 @@ onMounted(async () => {
     <div class="head">
       <h2>ทรัพย์สินที่พร้อมให้ยืม</h2>
       <p class="sub">เลือกทรัพย์สินที่ต้องการ แล้วระบุระยะเวลายืมทางด้านขวา</p>
+      <div v-if="repairAssets.length" class="repair-notice" role="status">
+        <strong>🛠️ มีทรัพย์สินกำลังซ่อมแซม {{ repairAssets.length }} รายการ</strong>
+        <span>ทรัพย์สินเหล่านี้แสดงไว้เพื่อตรวจสอบ แต่ไม่สามารถเลือกยืมได้จนกว่าจะซ่อมเสร็จ</span>
+        <div class="repair-list"><span v-for="a in repairAssets" :key="a.asset_id">{{ a.asset_name }} ({{ a.asset_code }})</span></div>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -146,18 +158,19 @@ onMounted(async () => {
           <div v-for="g in (grouped ? groups : [{ name: null, items: visible }])" :key="g.name ?? 'all'" class="group">
             <h3 v-if="g.name" class="gtitle">{{ g.name }} <span>{{ g.items.length }} รายการ</span></h3>
             <div class="grid">
-              <article v-for="a in g.items" :key="a.asset_id" class="item" :class="{ on: isSelected(a.asset_id) }"
-                       tabindex="0" @click="toggle(a)" @keydown.enter.prevent="toggle(a)" @keydown.space.prevent="toggle(a)">
+              <article v-for="a in g.items" :key="a.asset_id" class="item" :class="{ on: isSelected(a.asset_id), repairing: a.status === 'repair' }"
+                       :tabindex="a.status === 'available' ? 0 : -1" :aria-disabled="a.status === 'repair'" @click="toggle(a)" @keydown.enter.prevent="toggle(a)" @keydown.space.prevent="toggle(a)">
                 <div class="pic">
                   <img v-if="a.image_url" :src="a.image_url" :alt="a.asset_name" loading="lazy" />
                   <span v-else class="nopic">ไม่มีรูปภาพ</span>
                   <span v-if="isSelected(a.asset_id)" class="tick">✓</span>
+                  <span v-if="a.status === 'repair'" class="repair-overlay">🛠️ กำลังซ่อมแซม</span>
                 </div>
                 <div class="info">
                   <h4>{{ a.asset_name }}</h4>
                   <p v-if="a.brand || a.model" class="bm">{{ [a.brand, a.model].filter(Boolean).join(' · ') }}</p>
                   <p class="meta"><span>{{ a.asset_code }}</span><span>📍 {{ a.location || '-' }}</span></p>
-                  <span class="pickbtn">{{ isSelected(a.asset_id) ? '✓ เลือกแล้ว' : '+ เลือกยืม' }}</span>
+                  <span class="pickbtn" :class="{ disabled: a.status === 'repair' }">{{ a.status === 'repair' ? '🛠️ กำลังซ่อม — เลือกไม่ได้' : (isSelected(a.asset_id) ? '✓ เลือกแล้ว' : '+ เลือกยืม') }}</span>
                 </div>
               </article>
             </div>
@@ -249,6 +262,13 @@ onMounted(async () => {
 .pickbtn { margin-top: auto; text-align: center; padding: 8px; border-radius: 9px; font-size: 14px; font-weight: 600; background: #eef3fb; color: var(--primary); transition: background .15s, color .15s; }
 .item:hover .pickbtn { background: #dfe9f8; }
 .item.on .pickbtn { background: var(--primary); color: #fff; }
+.item.repairing { cursor: not-allowed; opacity: .82; }
+.item.repairing:hover { transform: none; box-shadow: 0 2px 10px rgba(0, 0, 0, .06); }
+.pickbtn.disabled { background: #fff0e8; color: #a34b16; cursor: not-allowed; }
+.repair-overlay { position: absolute; inset: auto 8px 8px; border-radius: 8px; background: rgba(139, 61, 13, .94); color: #fff; text-align: center; padding: 8px 5px; font-size: 13px; font-weight: 700; }
+.repair-notice { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 18px; padding: 12px 14px; border: 1px solid #f0c18e; border-radius: 12px; background: #fff7ed; color: #8a4314; font-size: 13px; }
+.repair-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.repair-list span { background: #ffedd5; border-radius: 6px; padding: 4px 8px; }
 
 .panel { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(30, 61, 107, .12); }
 .panel h3 { margin: 0 0 12px; }

@@ -4,6 +4,7 @@ import api from '../../services/api';
 import { authState } from '../../services/auth';
 
 const d = ref(null);
+const repairs = ref([]);
 const error = ref('');
 const loading = ref(true);
 const refreshing = ref(false);
@@ -12,7 +13,12 @@ let timer;
 async function load(manual = false) {
   if (manual) refreshing.value = true;
   try {
-    d.value = (await api.get('/dashboard')).data;
+    const results = await Promise.all([
+      api.get('/dashboard'),
+      api.get('/repairs').catch(() => ({ data: [] })),
+    ]);
+    d.value = results[0].data;
+    repairs.value = Array.isArray(results[1].data) ? results[1].data : [];
     error.value = '';
   } catch (e) {
     error.value = e.response?.data?.message || 'โหลดข้อมูลแดชบอร์ดไม่สำเร็จ';
@@ -36,6 +42,7 @@ const attention = computed(() => !d.value ? [] : [
   { key: 'overdue', icon: '⏰', label: 'เกินกำหนดคืน', value: d.value.overdue.count, unit: 'รายการ', to: '/admin/returns', tone: 'red' },
   { key: 'review', icon: '🧾', label: 'สลิปรอตรวจสอบ', value: d.value.fines.review_count, unit: 'รายการ', to: '/admin/fines', tone: 'amber' },
   { key: 'unpaid', icon: '💸', label: 'ค่าปรับค้างชำระ', value: `฿${money(d.value.fines.unpaid_total)}`, sub: `${d.value.fines.unpaid_count} รายการ`, raw: d.value.fines.unpaid_count, to: '/admin/fines', tone: 'red' },
+  { key: 'repairs', icon: '🛠️', label: 'งานซ่อมที่ต้องดำเนินการ', value: repairs.value.filter(r => ['pending', 'in_progress'].includes(r.repair_status)).length, unit: 'รายการ', to: '/admin/repairs', tone: 'amber' },
 ]);
 const isZero = (a) => (a.raw !== undefined ? a.raw === 0 : a.value === 0);
 
@@ -156,6 +163,21 @@ const topMax = computed(() => (d.value && d.value.top_assets.length ? d.value.to
               <span class="late">เกิน {{ o.days_late }} วัน</span>
             </div>
             <p v-if="d.overdue.count > d.overdue.items.length" class="muted more-note">และอีก {{ d.overdue.count - d.overdue.items.length }} รายการ</p>
+          </div>
+
+          <!-- งานซ่อมล่าสุด -->
+          <div class="panel">
+            <div class="p-head"><h3>งานซ่อมบำรุงล่าสุด</h3><router-link to="/admin/repairs" class="more">จัดการงานซ่อม →</router-link></div>
+            <p v-if="repairs.length === 0" class="empty">ยังไม่มีรายการซ่อม</p>
+            <div v-for="r in repairs.slice(0, 5)" :key="r.repair_id" class="li">
+              <div class="li-main">
+                <b>{{ r.asset_name || ('ทรัพย์สิน #' + r.asset_id) }}</b>
+                <span class="muted">งาน #{{ r.repair_id }} · {{ r.problem_detail }} · {{ r.report_date ? String(r.report_date).slice(0, 10) : '-' }}</span>
+              </div>
+              <span class="badge" :class="r.repair_status === 'done' ? 'b-returned' : r.repair_status === 'cannot_repair' ? 'b-rejected' : r.repair_status === 'in_progress' ? 'b-approved' : 'b-pending'">
+                {{ ({ pending: 'รอซ่อม', in_progress: 'กำลังซ่อม', done: 'ซ่อมเสร็จ', cannot_repair: 'ซ่อมไม่ได้' })[r.repair_status] || r.repair_status }}
+              </span>
+            </div>
           </div>
 
           <!-- คำขอล่าสุด -->

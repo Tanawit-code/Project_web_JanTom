@@ -15,11 +15,13 @@ import AdminReturns from '../views/admin/AdminReturns.vue';
 import AdminEmployees from '../views/admin/AdminEmployees.vue';
 import AdminDashboard from '../views/admin/AdminDashboard.vue';
 import AdminFines from '../views/admin/AdminFines.vue';
+import AdminRepairs from '../views/admin/AdminRepairs.vue';
 import MyFines from '../views/MyFines.vue';
 import Contact from '../views/Contact.vue';
 import Profile from '../views/Profile.vue';
 import ConfirmEmailChange from '../views/ConfirmEmailChange.vue';
 import ConfirmPasswordChange from '../views/ConfirmPasswordChange.vue';
+import AdminReports from '../views/admin/AdminReports.vue';
 
 const routes = [
   { path: '/login', component: Login },
@@ -38,9 +40,12 @@ const routes = [
   { path: '/admin/returns', component: AdminReturns, meta: { requiresRole: ['admin', 'approver'] } },
   { path: '/admin/dashboard', component: AdminDashboard, meta: { requiresRole: ['admin'] } },
   { path: '/admin/fines', component: AdminFines, meta: { requiresRole: ['admin'] } },
+  { path: '/admin/repairs', component: AdminRepairs, meta: { requiresRole: ['admin', 'approver'] } },
   { path: '/admin/employees', component: AdminEmployees, meta: { requiresRole: ['admin'] } },
   { path: '/contact', component: Contact, meta: { requiresAuth: true } },
   { path: '/profile', component: Profile, meta: { requiresAuth: true } },
+  { path: '/admin/reports', component: AdminReports, meta: { requiresRole: ['admin'] }
+}
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });
