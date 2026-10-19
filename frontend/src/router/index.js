@@ -8,6 +8,7 @@ import ForgotPassword from '../views/ForgotPassword.vue';
 import ResetPassword from '../views/ResetPassword.vue';
 import Home from '../views/Home.vue';
 import Assets from '../views/Assets.vue';
+import AssetDetails from '../views/AssetDetails.vue';
 import MyBorrows from '../views/MyBorrows.vue';
 import Approvals from '../views/Approvals.vue';
 import AdminAssets from '../views/admin/AdminAssets.vue';
@@ -22,6 +23,7 @@ import Profile from '../views/Profile.vue';
 import ConfirmEmailChange from '../views/ConfirmEmailChange.vue';
 import ConfirmPasswordChange from '../views/ConfirmPasswordChange.vue';
 import AdminReports from '../views/admin/AdminReports.vue';
+import AdminReservations from '../views/admin/AdminReservations.vue';
 
 const routes = [
   { path: '/login', component: Login },
@@ -33,11 +35,13 @@ const routes = [
   { path: '/approve-registration', component: ApproveRegistration, meta: { requiresRole: ['admin'] } },
   { path: '/', component: Home, meta: { requiresAuth: true } },
   { path: '/assets', component: Assets, meta: { requiresAuth: true } },
+  { path: '/assets/:id', component: AssetDetails, meta: { requiresAuth: true } },
   { path: '/my-borrows', component: MyBorrows, meta: { requiresAuth: true } },
   { path: '/my-fines', component: MyFines, meta: { requiresAuth: true } },
   { path: '/approvals', component: Approvals, meta: { requiresRole: ['approver', 'admin'] } },
   { path: '/admin/assets', component: AdminAssets, meta: { requiresRole: ['admin'] } },
   { path: '/admin/returns', component: AdminReturns, meta: { requiresRole: ['admin', 'approver'] } },
+  { path: '/admin/reservations', component: AdminReservations, meta: { requiresRole: ['admin'] } },
   { path: '/admin/dashboard', component: AdminDashboard, meta: { requiresRole: ['admin'] } },
   { path: '/admin/fines', component: AdminFines, meta: { requiresRole: ['admin'] } },
   { path: '/admin/repairs', component: AdminRepairs, meta: { requiresRole: ['admin', 'approver'] } },

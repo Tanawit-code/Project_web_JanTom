@@ -39,6 +39,8 @@ const STATUS = {
 // ---- การ์ดต้องดำเนินการ ----
 const attention = computed(() => !d.value ? [] : [
   { key: 'pending', icon: '📝', label: 'คำขอรออนุมัติ', value: d.value.requests.pending, unit: 'รายการ', to: '/approvals', tone: 'blue' },
+  { key: 'reservations', icon: '📅', label: 'รายการจองอุปกรณ์', value: d.value.requests.reserved, unit: 'รายการ', to: '/admin/reservations', tone: 'blue' },
+  { key: 'borrowed', icon: '📦', label: 'ทรัพย์สินที่กำลังถูกยืม', value: d.value.assets.borrowed, unit: 'รายการ', to: '/admin/returns', tone: 'blue' },
   { key: 'overdue', icon: '⏰', label: 'เกินกำหนดคืน', value: d.value.overdue.count, unit: 'รายการ', to: '/admin/returns', tone: 'red' },
   { key: 'review', icon: '🧾', label: 'สลิปรอตรวจสอบ', value: d.value.fines.review_count, unit: 'รายการ', to: '/admin/fines', tone: 'amber' },
   { key: 'unpaid', icon: '💸', label: 'ค่าปรับค้างชำระ', value: `฿${money(d.value.fines.unpaid_total)}`, sub: `${d.value.fines.unpaid_count} รายการ`, raw: d.value.fines.unpaid_count, to: '/admin/fines', tone: 'red' },

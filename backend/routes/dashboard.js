@@ -33,6 +33,7 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res) => {
       ),
       pool.query(
         `SELECT SUM(status = 'pending') AS pending,
+                SUM(status = 'reserved') AS reserved,
                 SUM(status = 'approved') AS approved_open,
                 SUM(status = 'returned') AS returned_total,
                 COUNT(*) AS total
@@ -113,6 +114,7 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res) => {
       categories: categories.map((c) => ({ cat_name: c.cat_name, total: Number(c.total), borrowed: Number(c.borrowed || 0) })),
       requests: {
         pending: Number(reqCounts.pending || 0),
+        reserved: Number(reqCounts.reserved || 0),
         approved_open: Number(reqCounts.approved_open || 0),
         returned_total: Number(reqCounts.returned_total || 0),
         total: Number(reqCounts.total || 0),
