@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import api from '../../services/api';
+import QRCode from 'qrcode';
 
 const assets = ref([]);
 const categories = ref([]);
@@ -19,8 +20,12 @@ const uploading = ref(false);
 const saving = ref(false);
 const deleting = ref(null);
 const formCard = ref(null);
+const qrAsset = ref(null);
+const qrImage = ref('');
+const qrUrl = ref('');
+const qrError = ref('');
 
-const STATUS_TH = { available: 'ว่าง', borrowed: 'ถูกยืม', repair: 'ส่งซ่อม', retired: 'จำหน่ายออก' };
+const STATUS_TH = { available: 'ว่าง', reserved: 'ถูกจอง', borrowed: 'ถูกยืม', repair: 'ส่งซ่อม', retired: 'จำหน่ายออก' };
 const todayStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 const money = (n) => (n == null || n === '' ? '-' : Number(n).toLocaleString('th-TH', { maximumFractionDigits: 0 }));
 
@@ -104,6 +109,19 @@ async function confirmDelete() {
   } catch (e) { error.value = e.response?.data?.message || 'ลบไม่สำเร็จ'; deleting.value = null; }
 }
 
+async function showQr(asset) {
+  qrAsset.value = asset;
+  qrImage.value = '';
+  qrError.value = '';
+  qrUrl.value = `${window.location.origin}/assets/${asset.asset_id}`;
+  try {
+    qrImage.value = await QRCode.toDataURL(qrUrl.value, { width: 420, margin: 2, errorCorrectionLevel: 'H' });
+  } catch (e) {
+    qrError.value = 'สร้าง QR Code ไม่สำเร็จ';
+    console.error('[asset-qr] failed to generate:', e);
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -112,7 +130,7 @@ onMounted(load);
     <div class="page-head">
       <div>
         <h2>จัดการทรัพย์สิน</h2>
-        <p class="page-sub">ทั้งหมด {{ assets.length }} รายการ · ว่าง {{ statusCounts.available || 0 }} · ถูกยืม {{ statusCounts.borrowed || 0 }}</p>
+        <p class="page-sub">ทั้งหมด {{ assets.length }} รายการ · ว่าง {{ statusCounts.available || 0 }} · ถูกจอง {{ statusCounts.reserved || 0 }} · ถูกยืม {{ statusCounts.borrowed || 0 }}</p>
       </div>
       <button v-if="!showForm" class="btn" @click="openForm">+ เพิ่มทรัพย์สิน</button>
     </div>
@@ -205,6 +223,7 @@ onMounted(load);
               <td><span class="badge" :class="a.status">{{ STATUS_TH[a.status] || a.status }}</span></td>
               <td class="actions">
                 <div class="row-actions">
+                  <button class="btn secondary sm" @click="showQr(a)">QR Code</button>
                   <button class="btn secondary sm" @click="startEdit(a)">แก้ไข</button>
                   <button class="btn danger sm" @click="deleting = a">ลบ</button>
                 </div>
@@ -212,6 +231,24 @@ onMounted(load);
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div v-if="qrAsset" class="overlay" @click.self="qrAsset = null">
+      <div class="modal qr-modal">
+        <h3>QR Code: {{ qrAsset.asset_name }}</h3>
+        <p class="hint">สแกนเพื่อเปิดรายละเอียดและประวัติการยืมของทรัพย์สินชิ้นนี้</p>
+        <p v-if="qrError" class="error-text">{{ qrError }}</p>
+        <div v-else-if="qrImage" class="qr-content">
+          <img :src="qrImage" :alt="`QR Code for ${qrAsset.asset_name}`" />
+          <code>{{ qrUrl }}</code>
+        </div>
+        <p v-else class="hint">กำลังสร้าง QR Code...</p>
+        <div class="form-actions">
+          <button class="btn secondary" @click="qrAsset = null">ปิด</button>
+          <a v-if="qrImage" class="btn" :href="qrImage" :download="`${qrAsset.asset_code}-QR.png`">ดาวน์โหลด PNG</a>
+          <a v-if="qrImage" class="btn secondary" :href="qrUrl" target="_blank" rel="noopener">เปิดหน้ารายละเอียด</a>
+        </div>
       </div>
     </div>
 
@@ -242,6 +279,10 @@ onMounted(load);
 @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } .pic { max-width: 220px; } }
 
 .list { padding: 8px 12px; }
+.qr-modal { max-width: 460px; }
+.qr-content { display: grid; justify-items: center; gap: 10px; padding: 8px 0 18px; }
+.qr-content img { width: min(300px, 100%); height: auto; image-rendering: pixelated; }
+.qr-content code { max-width: 100%; overflow-wrap: anywhere; color: var(--muted); text-align: center; font-size: 12px; }
 .thumbcell { width: 64px; }
 .thumb { width: 52px; height: 52px; object-fit: contain; border-radius: 8px; border: 1px solid var(--line); background: #fff; display: block; }
 .thumb.none { display: flex; align-items: center; justify-content: center; color: #b5bcc8; background: #f1f3f7; }

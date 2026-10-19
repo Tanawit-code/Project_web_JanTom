@@ -106,4 +106,17 @@ async function sendNotifyEmail({ to, subject, heading, lines = [], link, linkTex
   return sendMail({ to, subject, html, devLog: `${subject}${link ? ' -> ' + link : ''}` });
 }
 
-module.exports = { sendNotifyEmail, sendResetEmail, sendApprovalRequestEmail, sendRegistrationResultEmail, sendEmailChangeConfirmation, sendPasswordChangeConfirmation };
+async function sendDueReminderEmail({ to, name, borrowCode, dueDate, items }) {
+  return sendMail({
+    to,
+    subject: `แจ้งเตือน: ใกล้ถึงกำหนดคืนทรัพย์สิน ${borrowCode}`,
+    html: `<h3>แจ้งเตือนกำหนดคืนทรัพย์สิน</h3>
+      <p>เรียน ${esc(name || 'ผู้ยืม')}</p>
+      <p>รายการยืม <b>${esc(borrowCode)}</b> มีกำหนดคืนวันที่ <b>${esc(dueDate)}</b></p>
+      <p>ทรัพย์สิน: ${items.map(esc).join(', ')}</p>
+      <p>กรุณาดำเนินการคืนภายในกำหนด ขอบคุณครับ</p>`,
+    devLog: `Due reminder ${borrowCode}`,
+  });
+}
+
+module.exports = { sendNotifyEmail, sendDueReminderEmail, sendResetEmail, sendApprovalRequestEmail, sendRegistrationResultEmail, sendEmailChangeConfirmation, sendPasswordChangeConfirmation };

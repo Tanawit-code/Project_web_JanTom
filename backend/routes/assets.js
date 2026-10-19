@@ -22,6 +22,36 @@ router.get('/', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
+router.get('/:id/history', requireAuth, async (req, res) => {
+  try {
+    const [assets] = await pool.query('SELECT asset_id FROM ASSET WHERE asset_id=?', [req.params.id]);
+    if (!assets.length) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
+    const [rows] = await pool.query(
+      `SELECT br.borrow_id, br.borrow_code,
+              COALESCE(br.approve_date, br.pickup_date, br.request_date) AS borrowed_at,
+              CASE WHEN rr.return_id IS NOT NULL THEN 'returned' ELSE br.status END AS status,
+              e.first_name, e.last_name, rr.return_date, rr.condition_in, bd.condition_out,
+              CASE
+                WHEN rr.return_id IS NULL THEN NULL
+                WHEN EXISTS (SELECT 1 FROM FINE f WHERE f.detail_id=bd.detail_id AND f.fine_type='damaged') THEN 1
+                WHEN LOWER(COALESCE(rr.condition_in, '')) REGEXP 'ร้าว|แตก|เสีย|ชำรุด|ตำหนิ|เสียหาย' THEN 1
+                ELSE 0
+              END AS has_defect
+       FROM BORROW_DETAIL bd
+       JOIN BORROW_REQUEST br ON br.borrow_id=bd.borrow_id
+       JOIN EMPLOYEE e ON e.emp_id=br.emp_id
+       LEFT JOIN RETURN_RECORD rr ON rr.detail_id=bd.detail_id
+       WHERE bd.asset_id=?
+       ORDER BY COALESCE(br.approve_date, br.pickup_date, br.request_date) DESC, br.borrow_id DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการโหลดประวัติทรัพย์สิน' });
+  }
+});
+
 router.get('/:id', requireAuth, async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM ASSET WHERE asset_id = ?', [req.params.id]);
   if (rows.length === 0) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
