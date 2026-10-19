@@ -23,6 +23,7 @@ const manageItems = computed(() => {
   const items = [
     { to: '/approvals', icon: '✅', label: 'อนุมัติคำขอ' },
     { to: '/admin/returns', icon: '📦', label: 'รับคืนทรัพย์สิน' },
+    { to: '/admin/repairs', icon: '🛠️', label: 'จัดการงานซ่อมบำรุง' },
   ];
   if (isAdmin.value) {
     items.push(
@@ -71,14 +72,38 @@ const money = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 
 <template>
   <header class="top">
     <nav class="bar">
-      <router-link to="/" class="brand">ระบบยืมคืนทรัพย์สินบริษัท</router-link>
+      
+<router-link to="/" class="brand">
+  <img
+    src="/logo-company.png"
+    alt="THAIASSET Logo"
+    class="brand-logo"
+  />
+
+  <span class="brand-text">
+    <span class="brand-name">THAIASSET</span>
+    <span class="brand-subtitle">ASSET MANAGEMENT SYSTEM</span>
+  </span>
+</router-link>
+
 
       <template v-if="authState.user">
         <button class="burger" type="button" aria-label="เมนู" @click.stop="mobileOpen = !mobileOpen">{{ mobileOpen ? '✕' : '☰' }}</button>
 
         <div class="links" :class="{ open: mobileOpen }">
-          <router-link v-if="isAdmin" to="/admin/dashboard" class="nl">แดชบอร์ด</router-link>
-          <router-link to="/assets" class="nl">ทรัพย์สิน</router-link>
+          
+<router-link v-if="isAdmin" to="/admin/dashboard" class="nl">
+  แดชบอร์ด
+</router-link>
+
+<router-link to="/assets" class="nl">
+  ทรัพย์สิน
+</router-link>
+
+<router-link v-if="isAdmin" to="/admin/reports" class="nl">
+  📊 รายงาน
+</router-link>
+
           <template v-if="!isAdmin">
             <router-link to="/my-borrows" class="nl">คำขอของฉัน</router-link>
             <router-link to="/my-fines" class="nl">ค่าปรับของฉัน<span v-if="unpaid.count > 0" class="pill">{{ unpaid.count }}</span></router-link>
@@ -185,4 +210,68 @@ const money = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 
   .burger { margin-left: auto; }
   .me-name { display: none; }
 }
+
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 18px;
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  padding: 3px;
+  box-sizing: border-box;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.brand-name {
+  font-size: 19px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
+
+.brand-subtitle {
+  font-size: 9px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+@media (max-width: 860px) {
+  .brand {
+    margin-right: 0;
+    gap: 8px;
+  }
+
+  .brand-logo {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  .brand-subtitle {
+    font-size: 8px;
+  }
+}
+
 </style>
