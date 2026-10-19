@@ -40,3 +40,4 @@ app.use('/api/reports', reportsRoutes);
 
 const PORT = process.env.PORT || 4100;
 app.listen(PORT, () => console.log(`Asset system API running on http://localhost:${PORT}`));
+startDueReminderJob();

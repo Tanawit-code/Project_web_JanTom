@@ -5,6 +5,8 @@ import api from '../services/api';
 const requests = ref([]);
 const loading = ref(true);
 const filter = ref('all');
+const actionError = ref('');
+const submitting = ref(null);
 
 async function load() {
   try { requests.value = (await api.get('/borrow-requests/mine')).data; }
@@ -12,10 +14,22 @@ async function load() {
 }
 onMounted(load);
 
-const STATUS_TH = { pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ถูกปฏิเสธ', returned: 'คืนแล้ว', cancelled: 'ยกเลิก' };
+async function pickup(r) {
+  actionError.value = '';
+  submitting.value = r.borrow_id;
+  try {
+    await api.post(`/borrow-requests/${r.borrow_id}/pickup`);
+    await load();
+  } catch (e) {
+    actionError.value = e.response?.data?.message || 'ดำเนินการไม่สำเร็จ';
+  } finally { submitting.value = null; }
+}
+
+const STATUS_TH = { pending: 'รออนุมัติ', reserved: 'ถูกจอง', approved: 'อนุมัติแล้ว', rejected: 'ถูกปฏิเสธ', returned: 'คืนแล้ว', cancelled: 'ยกเลิก' };
 const FILTERS = [
   { key: 'all', label: 'ทั้งหมด' },
   { key: 'pending', label: 'รออนุมัติ' },
+  { key: 'reserved', label: 'จองไว้' },
   { key: 'approved', label: 'กำลังยืม' },
   { key: 'returned', label: 'คืนแล้ว' },
   { key: 'rejected', label: 'ไม่อนุมัติ' },
@@ -48,6 +62,7 @@ const overdue = (r) => r.status === 'approved' && r.due_date && r.due_date.slice
         {{ f.label }}<span class="n">{{ counts[f.key] || 0 }}</span>
       </button>
     </div>
+    <p v-if="actionError" class="error-text">{{ actionError }}</p>
 
     <p v-if="loading" class="empty-state">กำลังโหลด...</p>
     <div v-else-if="shown.length === 0" class="card empty-state">
@@ -67,8 +82,12 @@ const overdue = (r) => r.status === 'approved' && r.due_date && r.due_date.slice
 
       <div class="dates">
         <div><span>วันที่ส่งคำขอ</span><b>{{ fmt(r.request_date) }}</b></div>
+        <div v-if="r.status === 'reserved'"><span>วันที่นัดรับ</span><b>{{ fmt(r.pickup_date) }}</b></div>
         <div><span>กำหนดคืน</span><b :class="{ red: overdue(r) }">{{ fmt(r.due_date) }}</b></div>
       </div>
+      <button v-if="r.status === 'reserved' && r.pickup_date?.slice(0, 10) <= today()" class="btn" :disabled="submitting === r.borrow_id" @click="pickup(r)">
+        {{ submitting === r.borrow_id ? 'กำลังส่ง...' : 'มารับแล้ว — ส่งคำขอยืม' }}
+      </button>
 
       <p v-if="r.purpose" class="purpose"><span>วัตถุประสงค์:</span> {{ r.purpose }}</p>
 
@@ -86,6 +105,7 @@ const overdue = (r) => r.status === 'approved' && r.due_date && r.due_date.slice
 <style scoped>
 .req { background: #fff; border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px; box-shadow: var(--shadow); border-left: 5px solid #d7dae0; }
 .req.pending { border-left-color: var(--warn); }
+.req.reserved { border-left-color: #8b5cf6; }
 .req.approved { border-left-color: var(--primary); }
 .req.returned { border-left-color: var(--ok); }
 .req.rejected { border-left-color: var(--danger); }

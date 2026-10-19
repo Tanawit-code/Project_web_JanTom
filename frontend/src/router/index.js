@@ -8,6 +8,7 @@ import ForgotPassword from '../views/ForgotPassword.vue';
 import ResetPassword from '../views/ResetPassword.vue';
 import Home from '../views/Home.vue';
 import Assets from '../views/Assets.vue';
+import AssetDetails from '../views/AssetDetails.vue';
 import MyBorrows from '../views/MyBorrows.vue';
 import Approvals from '../views/Approvals.vue';
 import AdminAssets from '../views/admin/AdminAssets.vue';
@@ -33,6 +34,7 @@ const routes = [
   { path: '/approve-registration', component: ApproveRegistration, meta: { requiresRole: ['admin'] } },
   { path: '/', component: Home, meta: { requiresAuth: true } },
   { path: '/assets', component: Assets, meta: { requiresAuth: true } },
+  { path: '/assets/:id', component: AssetDetails, meta: { requiresAuth: true } },
   { path: '/my-borrows', component: MyBorrows, meta: { requiresAuth: true } },
   { path: '/my-fines', component: MyFines, meta: { requiresAuth: true } },
   { path: '/approvals', component: Approvals, meta: { requiresRole: ['approver', 'admin'] } },
