@@ -15,6 +15,7 @@ const notificationRoutes = require('./routes/notifications');
 const dashboardRoutes = require('./routes/dashboard');
 const repairRoutes = require('./routes/repairs');
 const reportsRoutes = require('./routes/reports');
+const { startDueReminderJob } = require('./utils/dueReminder');
 
 const app = express();
 app.use(cors());

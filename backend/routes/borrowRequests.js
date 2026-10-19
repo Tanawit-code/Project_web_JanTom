@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { bangkokToday, bangkokDatePlusDays, isValidCeDate } = require('../utils/dates');
+const { notifyAdmins } = require('../utils/notify');
 
 function genBorrowCode() {
   const d = new Date();
@@ -23,7 +24,7 @@ router.post('/', requireAuth, async (req, res) => {
     if ((!useDays && !due_date) || !Array.isArray(asset_ids) || asset_ids.length === 0) {
       return res.status(400).json({ message: 'กรุณาเลือกระยะเวลายืมและเลือกทรัพย์สินอย่างน้อย 1 รายการ' });
     }
-    if (reserve && (!isValidCeDate(pickup_date) || pickup_date.slice(0, 10) < bangkokToday() || pickup_date.slice(0, 10) > bangkokDatePlusDays(7))) {
+    if (reserve && (typeof pickup_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(pickup_date) || !isValidCeDate(pickup_date) || pickup_date < bangkokToday() || pickup_date > bangkokDatePlusDays(7))) {
       return res.status(400).json({ message: 'วันรับต้องอยู่ระหว่างวันนี้ถึง 7 วันข้างหน้า' });
     }
     if (!useDays && (!isValidCeDate(due_date) || due_date.slice(0, 10) < bangkokToday())) {
@@ -39,7 +40,7 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ message: 'รายการทรัพย์สินไม่ถูกต้อง' });
     }
     const [assets] = await conn.query(
-      `SELECT asset_id, status FROM ASSET WHERE asset_id IN (?) FOR UPDATE`, [uniqueAssetIds]
+      `SELECT asset_id, asset_name, asset_code, status FROM ASSET WHERE asset_id IN (?) FOR UPDATE`, [uniqueAssetIds]
     );
     const notAvailable = assets.filter((a) => a.status !== 'available');
     if (assets.length !== asset_ids.length || notAvailable.length > 0) {
@@ -81,6 +82,27 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     await conn.commit();
+    try {
+      const [[requester]] = await pool.query(
+        'SELECT first_name, last_name FROM EMPLOYEE WHERE emp_id = ?', [req.user.emp_id]
+      );
+      const [[requestTime]] = await pool.query(
+        "SELECT DATE_FORMAT(request_date, '%d/%m/%Y %H:%i') AS requested_at FROM BORROW_REQUEST WHERE borrow_id = ?",
+        [borrow_id]
+      );
+      const assetSummary = assets.slice(0, 2).map((a) => `${a.asset_name} (${a.asset_code})`).join(', ')
+        + (assets.length > 2 ? ` และอีก ${assets.length - 2} รายการ` : '');
+      await notifyAdmins(pool, {
+        type: reserve ? 'reserve_created' : 'borrow_request_created',
+        title: reserve ? 'มีการจองทรัพย์สินล่วงหน้า' : 'มีคำขอยืมใหม่รออนุมัติ',
+        message: reserve
+          ? `${requester.first_name} ${requester.last_name} · ${borrow_code} · จองเมื่อ ${requestTime.requested_at} · นัดรับ ${pickup} · ${assetSummary}`
+          : `${requester.first_name} ${requester.last_name} · ${borrow_code} · ส่งเมื่อ ${requestTime.requested_at} · คืน ${finalDue} · ${assetSummary}`,
+        link: reserve ? '/admin/reservations' : '/approvals',
+      });
+    } catch (notifyErr) {
+      console.error('[borrow-requests] notification failed:', notifyErr.message);
+    }
     res.status(201).json({ borrow_id, borrow_code, message: reserve ? 'จองทรัพย์สินสำเร็จ' : 'ส่งคำขอยืมสำเร็จ รอการอนุมัติ' });
   } catch (err) {
     await conn.rollback();
@@ -148,6 +170,77 @@ router.get('/pending', requireAuth, requireRole('approver', 'admin'), async (req
     r.items = details;
   }
   res.json(requests);
+});
+
+// Admin: list active reservations with borrower and asset details.
+router.get('/reservations', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT br.borrow_id, br.borrow_code,
+              DATE_FORMAT(br.request_date, '%Y-%m-%d %H:%i') AS request_date,
+              DATE_FORMAT(br.pickup_date, '%Y-%m-%d') AS pickup_date,
+              DATE_FORMAT(br.due_date, '%Y-%m-%d') AS due_date,
+              br.purpose, e.first_name, e.last_name, e.emp_code,
+              bd.detail_id, a.asset_id, a.asset_name, a.asset_code
+       FROM BORROW_REQUEST br
+       JOIN EMPLOYEE e ON e.emp_id = br.emp_id
+       JOIN BORROW_DETAIL bd ON bd.borrow_id = br.borrow_id
+       JOIN ASSET a ON a.asset_id = bd.asset_id
+       WHERE br.status = 'reserved'
+       ORDER BY br.pickup_date ASC, br.request_date ASC, br.borrow_id ASC`
+    );
+    const reservations = new Map();
+    for (const row of rows) {
+      if (!reservations.has(row.borrow_id)) {
+        reservations.set(row.borrow_id, {
+          borrow_id: row.borrow_id, borrow_code: row.borrow_code,
+          request_date: row.request_date, pickup_date: row.pickup_date,
+          due_date: row.due_date, purpose: row.purpose,
+          first_name: row.first_name, last_name: row.last_name, emp_code: row.emp_code,
+          items: [],
+        });
+      }
+      reservations.get(row.borrow_id).items.push({
+        detail_id: row.detail_id, asset_id: row.asset_id,
+        asset_name: row.asset_name, asset_code: row.asset_code,
+      });
+    }
+    res.json([...reservations.values()]);
+  } catch (err) {
+    console.error('[borrow-requests] reservations:', err);
+    res.status(500).json({ message: 'โหลดรายการจองไม่สำเร็จ' });
+  }
+});
+
+// Admin: cancel a reservation before the borrower checks in.
+router.delete('/:id/reservation', requireAuth, requireRole('admin'), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[reservation]] = await conn.query(
+      `SELECT borrow_id FROM BORROW_REQUEST WHERE borrow_id = ? AND status = 'reserved' FOR UPDATE`,
+      [req.params.id]
+    );
+    if (!reservation) {
+      await conn.rollback();
+      return res.status(409).json({ message: 'รายการนี้ไม่อยู่ในสถานะจอง หรือดำเนินการไปแล้ว' });
+    }
+    const [items] = await conn.query(
+      'SELECT asset_id FROM BORROW_DETAIL WHERE borrow_id = ? FOR UPDATE', [reservation.borrow_id]
+    );
+    await conn.query("UPDATE BORROW_REQUEST SET status = 'cancelled' WHERE borrow_id = ?", [reservation.borrow_id]);
+    for (const item of items) {
+      await conn.query("UPDATE ASSET SET status = 'available' WHERE asset_id = ? AND status = 'reserved'", [item.asset_id]);
+    }
+    await conn.commit();
+    res.json({ message: 'ยกเลิกการจองและคืนสถานะอุปกรณ์แล้ว' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('[borrow-requests] cancel reservation:', err);
+    res.status(500).json({ message: 'ยกเลิกการจองไม่สำเร็จ' });
+  } finally {
+    conn.release();
+  }
 });
 
 // Approver/admin: approve or reject

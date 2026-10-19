@@ -23,6 +23,7 @@ const manageItems = computed(() => {
   const items = [
     { to: '/approvals', icon: '✅', label: 'อนุมัติคำขอ' },
     { to: '/admin/returns', icon: '📦', label: 'รับคืนทรัพย์สิน' },
+    { to: '/admin/reservations', icon: '📅', label: 'รายการจองอุปกรณ์' },
     { to: '/admin/repairs', icon: '🛠️', label: 'จัดการงานซ่อมบำรุง' },
   ];
   if (isAdmin.value) {

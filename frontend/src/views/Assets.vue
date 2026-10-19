@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import api from '../services/api';
 
 const allAssets = ref([]); // แสดงทั้งทรัพย์สินพร้อมให้ยืมและทรัพย์สินที่กำลังซ่อม
@@ -20,6 +20,15 @@ const historyAsset = ref(null);
 const historyRows = ref([]);
 const historyLoading = ref(false);
 const historyError = ref('');
+let resettingAfterSubmit = false;
+
+watch([mode, pickupDate, days, purpose, selected], () => {
+  if (resettingAfterSubmit) {
+    resettingAfterSubmit = false;
+    return;
+  }
+  success.value = '';
+}, { deep: true });
 
 const DURATIONS = [
   { days: 1, label: '1 วัน' },
@@ -44,13 +53,14 @@ async function load() {
   try {
     const { data } = await api.get('/assets');
     // แสดงเฉพาะทรัพย์สินที่พร้อมให้ยืมและที่กำลังซ่อม ส่วนสถานะอื่นไม่แสดงในหน้านี้
-    allAssets.value = data.filter((a) => ['available', 'repair'].includes(a.status));
+    allAssets.value = data.filter((a) => ['available', 'repair', 'reserved'].includes(a.status));
     // ถ้าทรัพย์สินที่ถูกเลือกเปลี่ยนสถานะเป็นซ่อม ให้เอาออกจากรายการที่เลือกทันที
     selected.value = selected.value.filter((picked) => allAssets.value.some((a) => a.asset_id === picked.asset_id && a.status === 'available'));
   } finally { loading.value = false; }
 }
 
 const repairAssets = computed(() => searched.value.filter((a) => a.status === 'repair'));
+const reservedAssets = computed(() => searched.value.filter((a) => a.status === 'reserved'));
 const borrowableAssets = computed(() => searched.value.filter((a) => a.status === 'available'));
 
 const GENERAL = 'ทั่วไป';
@@ -119,13 +129,23 @@ const HISTORY_STATUS = { pending: 'รออนุมัติ', reserved: 'จ�
 async function submitRequest() {
   error.value = ''; success.value = '';
   if (selected.value.length === 0) { error.value = 'กรุณาเลือกทรัพย์สินอย่างน้อย 1 รายการ'; return; }
+  if (mode.value === 'reserve') {
+    const minDate = todayIso();
+    const maxDate = new Date(Date.parse(`${minDate}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate.value) || pickupDate.value < minDate || pickupDate.value > maxDate) {
+      error.value = 'วันที่รับต้องเป็นวันนี้หรือภายใน 7 วันข้างหน้า';
+      return;
+    }
+  }
   submitting.value = true;
   try {
     const { data } = await api.post('/borrow-requests', {
       mode: mode.value, pickup_date: mode.value === 'reserve' ? pickupDate.value : undefined,
       days: days.value, purpose: purpose.value, asset_ids: selected.value.map((a) => a.asset_id),
     });
-    success.value = `${data.message} (เลขที่คำขอ ${data.borrow_code})`;
+    const sentLabel = mode.value === 'reserve' ? 'ส่งคำขอจองแล้ว' : 'ส่งคำขอยืมแล้ว';
+    success.value = `${sentLabel} · ${data.message} (เลขที่คำขอ ${data.borrow_code})`;
+    resettingAfterSubmit = true;
     selected.value = []; purpose.value = '';
     load();
   } catch (e) {
@@ -148,6 +168,11 @@ onMounted(async () => {
         <strong>🛠️ มีทรัพย์สินกำลังซ่อมแซม {{ repairAssets.length }} รายการ</strong>
         <span>ทรัพย์สินเหล่านี้แสดงไว้เพื่อตรวจสอบ แต่ไม่สามารถเลือกยืมได้จนกว่าจะซ่อมเสร็จ</span>
         <div class="repair-list"><span v-for="a in repairAssets" :key="a.asset_id">{{ a.asset_name }} ({{ a.asset_code }})</span></div>
+      </div>
+      <div v-if="reservedAssets.length" class="reserved-notice" role="status">
+        <strong>📅 มีทรัพย์สินถูกจอง {{ reservedAssets.length }} รายการ</strong>
+        <span>แสดงไว้เพื่อตรวจสอบ แต่ไม่สามารถเลือกยืมได้จนกว่าจะยกเลิกหรือสิ้นสุดการจอง</span>
+        <div class="reserved-list"><span v-for="a in reservedAssets" :key="a.asset_id">{{ a.asset_name }} ({{ a.asset_code }})</span></div>
       </div>
     </div>
 
@@ -184,19 +209,20 @@ onMounted(async () => {
           <div v-for="g in (grouped ? groups : [{ name: null, items: visible }])" :key="g.name ?? 'all'" class="group">
             <h3 v-if="g.name" class="gtitle">{{ g.name }} <span>{{ g.items.length }} รายการ</span></h3>
             <div class="grid">
-              <article v-for="a in g.items" :key="a.asset_id" class="item" :class="{ on: isSelected(a.asset_id), repairing: a.status === 'repair' }"
-                       :tabindex="a.status === 'available' ? 0 : -1" :aria-disabled="a.status === 'repair'" @click="toggle(a)" @keydown.enter.prevent="toggle(a)" @keydown.space.prevent="toggle(a)">
+              <article v-for="a in g.items" :key="a.asset_id" class="item" :class="{ on: isSelected(a.asset_id), repairing: a.status === 'repair', reserved: a.status === 'reserved' }"
+                       :tabindex="a.status === 'available' ? 0 : -1" :aria-disabled="a.status !== 'available'" @click="toggle(a)" @keydown.enter.prevent="toggle(a)" @keydown.space.prevent="toggle(a)">
                 <div class="pic">
                   <img v-if="a.image_url" :src="a.image_url" :alt="a.asset_name" loading="lazy" />
                   <span v-else class="nopic">ไม่มีรูปภาพ</span>
                   <span v-if="isSelected(a.asset_id)" class="tick">✓</span>
                   <span v-if="a.status === 'repair'" class="repair-overlay">🛠️ กำลังซ่อมแซม</span>
+                  <span v-else-if="a.status === 'reserved'" class="reserved-overlay">📅 ถูกจอง — เลือกไม่ได้</span>
                 </div>
                 <div class="info">
                   <h4>{{ a.asset_name }}</h4>
                   <p v-if="a.brand || a.model" class="bm">{{ [a.brand, a.model].filter(Boolean).join(' · ') }}</p>
                   <p class="meta"><span>{{ a.asset_code }}</span><span>📍 {{ a.location || '-' }}</span></p>
-                  <span class="pickbtn" :class="{ disabled: a.status === 'repair' }">{{ a.status === 'repair' ? '🛠️ กำลังซ่อม — เลือกไม่ได้' : (isSelected(a.asset_id) ? '✓ เลือกแล้ว' : '+ เลือกยืม') }}</span>
+                  <span class="pickbtn" :class="{ disabled: a.status !== 'available' }">{{ a.status === 'repair' ? '🛠️ กำลังซ่อม — เลือกไม่ได้' : a.status === 'reserved' ? '📅 ถูกจอง — เลือกไม่ได้' : (isSelected(a.asset_id) ? '✓ เลือกแล้ว' : '+ เลือกยืม') }}</span>
                 </div>
               </article>
             </div>
@@ -250,8 +276,8 @@ onMounted(async () => {
         <p class="lbl">วัตถุประสงค์การยืม</p>
         <textarea v-model="purpose" rows="3" placeholder="เช่น ใช้ประชุมลูกค้านอกสถานที่"></textarea>
 
-        <button class="btn submit" :disabled="submitting || selected.length === 0 || (mode === 'reserve' && !pickupDate)" @click="submitRequest">
-          {{ submitting ? 'กำลังส่ง...' : mode === 'reserve' ? `จองทรัพย์สิน (${selected.length} รายการ)` : `ส่งคำขอยืม (${selected.length} รายการ)` }}
+        <button class="btn submit" :class="{ sent: !!success }" :disabled="submitting || selected.length === 0 || (mode === 'reserve' && !pickupDate)" @click="submitRequest">
+          {{ submitting ? 'กำลังส่ง...' : success ? (mode === 'reserve' ? 'ส่งคำขอจองแล้ว ✓' : 'ส่งคำขอยืมแล้ว ✓') : mode === 'reserve' ? `จองทรัพย์สิน (${selected.length} รายการ)` : `ส่งคำขอยืม (${selected.length} รายการ)` }}
         </button>
       </aside>
     </div>
@@ -337,6 +363,8 @@ onMounted(async () => {
 .item.unavailable:hover { transform: none; box-shadow: 0 2px 10px rgba(0, 0, 0, .06); }
 .item:focus-visible { outline: none; border-color: var(--primary); }
 .item.on { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43, 87, 151, .15); }
+.item.reserved { cursor: not-allowed; opacity: .84; }
+.item.reserved:hover { transform: none; box-shadow: 0 2px 10px rgba(0, 0, 0, .06); }
 /* รูปทุกใบสัดส่วนเดียวกัน แสดงเต็มภาพไม่โดนตัด */
 .pic { position: relative; aspect-ratio: 4 / 3; background: #fff; border-bottom: 1px solid #eef1f6; display: flex; align-items: center; justify-content: center; }
 .pic img { width: 100%; height: 100%; object-fit: contain; display: block; padding: 8px; box-sizing: border-box; }
@@ -356,9 +384,14 @@ onMounted(async () => {
 .item.repairing:hover { transform: none; box-shadow: 0 2px 10px rgba(0, 0, 0, .06); }
 .pickbtn.disabled { background: #fff0e8; color: #a34b16; cursor: not-allowed; }
 .repair-overlay { position: absolute; inset: auto 8px 8px; border-radius: 8px; background: rgba(139, 61, 13, .94); color: #fff; text-align: center; padding: 8px 5px; font-size: 13px; font-weight: 700; }
+.reserved-overlay { position: absolute; inset: auto 8px 8px; border-radius: 8px; background: rgba(91, 62, 145, .94); color: #fff; text-align: center; padding: 8px 5px; font-size: 13px; font-weight: 700; }
+.item.reserved .pickbtn.disabled { background: #f1eafe; color: #6d28d9; }
 .repair-notice { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 18px; padding: 12px 14px; border: 1px solid #f0c18e; border-radius: 12px; background: #fff7ed; color: #8a4314; font-size: 13px; }
 .repair-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .repair-list span { background: #ffedd5; border-radius: 6px; padding: 4px 8px; }
+.reserved-notice { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 18px; padding: 12px 14px; border: 1px solid #d8c8f2; border-radius: 12px; background: #faf7ff; color: #5b3e91; font-size: 13px; }
+.reserved-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.reserved-list span { background: #f1eafe; border-radius: 6px; padding: 4px 8px; }
 
 .panel { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(30, 61, 107, .12); }
 .panel h3 { margin: 0 0 12px; }
@@ -387,6 +420,7 @@ textarea { margin: 0; width: 100%; box-sizing: border-box; border-radius: 10px; 
 textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43, 87, 151, .15); }
 .submit { width: 100%; margin-top: 16px; padding: 12px; font-size: 15px; border-radius: 10px; }
 .submit:disabled { opacity: .55; cursor: not-allowed; }
+.submit.sent:disabled { opacity: 1; background: #238458; cursor: default; }
 .success-box { background: #e3f4ea; color: var(--ok); padding: 10px 12px; border-radius: 10px; font-size: 14px; margin: 0 0 12px; }
 
 @media (max-width: 860px) {
