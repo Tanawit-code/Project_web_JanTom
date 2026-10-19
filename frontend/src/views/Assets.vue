@@ -10,10 +10,16 @@ const search = ref('');
 const loading = ref(true);
 const selected = ref([]); // เก็บทั้ง object เพื่อให้ชื่อไม่หายตอนเปลี่ยนหมวด
 const days = ref(3);
+const mode = ref('borrow');
+const pickupDate = ref('');
 const purpose = ref('');
 const error = ref('');
 const success = ref('');
 const submitting = ref(false);
+const historyAsset = ref(null);
+const historyRows = ref([]);
+const historyLoading = ref(false);
+const historyError = ref('');
 
 const DURATIONS = [
   { days: 1, label: '1 วัน' },
@@ -26,11 +32,17 @@ const DURATIONS = [
 const fmt = (d) => d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 const borrowDateText = computed(() => fmt(new Date()));
 const dueDateText = computed(() => fmt(new Date(Date.now() + days.value * 86400000)));
+const reservationDueText = computed(() => pickupDate.value
+  ? fmt(new Date(Date.parse(`${pickupDate.value}T00:00:00Z`) + days.value * 86400000))
+  : '-');
+const todayIso = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+const maxPickupDate = computed(() => new Date(Date.parse(`${todayIso()}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10));
+const ASSET_STATUS = { available: 'ว่าง', reserved: 'ถูกจอง', borrowed: 'ถูกยืม', repair: 'ส่งซ่อม', retired: 'จำหน่ายออก' };
 
 async function load() {
   loading.value = true;
   try {
-    const { data } = await api.get('/assets', { params: { status: 'available' } });
+    const { data } = await api.get('/assets');
     allAssets.value = data;
   } finally { loading.value = false; }
 }
@@ -80,9 +92,23 @@ function pickCat(id) { activeCat.value = id; }
 
 const isSelected = (id) => selected.value.some((a) => a.asset_id === id);
 function toggle(a) {
+  if (a.status !== 'available') return;
   const i = selected.value.findIndex((x) => x.asset_id === a.asset_id);
   if (i === -1) selected.value.push({ asset_id: a.asset_id, asset_name: a.asset_name, asset_code: a.asset_code }); else selected.value.splice(i, 1);
 }
+
+async function showHistory(asset) {
+  historyAsset.value = asset;
+  historyRows.value = [];
+  historyError.value = '';
+  historyLoading.value = true;
+  try { historyRows.value = (await api.get(`/assets/${asset.asset_id}/history`)).data; }
+  catch (e) { historyError.value = e.response?.data?.message || 'โหลดประวัติไม่สำเร็จ'; }
+  finally { historyLoading.value = false; }
+}
+
+const fmtBorrowedAt = (value) => value ? new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+const HISTORY_STATUS = { pending: 'รออนุมัติ', reserved: 'จองแล้ว', approved: 'กำลังยืม', rejected: 'ไม่อนุมัติ', returned: 'คืนแล้ว', cancelled: 'ยกเลิก' };
 
 async function submitRequest() {
   error.value = ''; success.value = '';
@@ -90,6 +116,7 @@ async function submitRequest() {
   submitting.value = true;
   try {
     const { data } = await api.post('/borrow-requests', {
+      mode: mode.value, pickup_date: mode.value === 'reserve' ? pickupDate.value : undefined,
       days: days.value, purpose: purpose.value, asset_ids: selected.value.map((a) => a.asset_id),
     });
     success.value = `${data.message} (เลขที่คำขอ ${data.borrow_code})`;
@@ -146,8 +173,8 @@ onMounted(async () => {
           <div v-for="g in (grouped ? groups : [{ name: null, items: visible }])" :key="g.name ?? 'all'" class="group">
             <h3 v-if="g.name" class="gtitle">{{ g.name }} <span>{{ g.items.length }} รายการ</span></h3>
             <div class="grid">
-              <article v-for="a in g.items" :key="a.asset_id" class="item" :class="{ on: isSelected(a.asset_id) }"
-                       tabindex="0" @click="toggle(a)" @keydown.enter.prevent="toggle(a)" @keydown.space.prevent="toggle(a)">
+              <article v-for="a in g.items" :key="a.asset_id" class="item" :class="{ on: isSelected(a.asset_id), unavailable: a.status !== 'available' }"
+                       :tabindex="a.status === 'available' ? 0 : -1" @click="toggle(a)" @keydown.enter.prevent="toggle(a)" @keydown.space.prevent="toggle(a)">
                 <div class="pic">
                   <img v-if="a.image_url" :src="a.image_url" :alt="a.asset_name" loading="lazy" />
                   <span v-else class="nopic">ไม่มีรูปภาพ</span>
@@ -157,7 +184,9 @@ onMounted(async () => {
                   <h4>{{ a.asset_name }}</h4>
                   <p v-if="a.brand || a.model" class="bm">{{ [a.brand, a.model].filter(Boolean).join(' · ') }}</p>
                   <p class="meta"><span>{{ a.asset_code }}</span><span>📍 {{ a.location || '-' }}</span></p>
-                  <span class="pickbtn">{{ isSelected(a.asset_id) ? '✓ เลือกแล้ว' : '+ เลือกยืม' }}</span>
+                  <span class="asset-status" :class="a.status">{{ ASSET_STATUS[a.status] || a.status }}</span>
+                  <span class="pickbtn">{{ a.status !== 'available' ? 'ไม่พร้อมให้ยืม' : isSelected(a.asset_id) ? '✓ เลือกแล้ว' : '+ เลือกยืม' }}</span>
+                  <button type="button" class="history-link" @click.stop="showHistory(a)">ดูประวัติการยืม</button>
                 </div>
               </article>
             </div>
@@ -170,6 +199,16 @@ onMounted(async () => {
         <h3>ส่งคำขอยืม</h3>
         <p v-if="error" class="error-text">{{ error }}</p>
         <p v-if="success" class="success-box">{{ success }}</p>
+
+        <p class="lbl">วิธีรับทรัพย์สิน</p>
+        <div class="durations">
+          <button type="button" class="dur" :class="{ on: mode === 'borrow' }" @click="mode = 'borrow'">ยืมทันที</button>
+          <button type="button" class="dur" :class="{ on: mode === 'reserve' }" @click="mode = 'reserve'">จองล่วงหน้า</button>
+        </div>
+        <label v-if="mode === 'reserve'" class="lbl reserve-date">วันที่ต้องการมารับ
+          <input v-model="pickupDate" type="date" :min="todayIso()" :max="maxPickupDate" required />
+          <small>จองล่วงหน้าได้ไม่เกิน 7 วัน</small>
+        </label>
 
         <p class="lbl">รายการที่เลือก ({{ selected.length }})</p>
         <div class="picked">
@@ -187,25 +226,74 @@ onMounted(async () => {
           </button>
         </div>
 
-        <div class="dates">
+        <div v-if="mode === 'borrow'" class="dates">
           <div><span class="muted">วันที่ยืม</span><b>{{ borrowDateText }}</b><small>ตามเวลาที่ส่งคำขอ</small></div>
           <div class="arrow">→</div>
           <div><span class="muted">กำหนดคืน</span><b>{{ dueDateText }}</b><small>ภายในสิ้นวัน</small></div>
+        </div>
+        <div v-if="mode === 'reserve' && pickupDate" class="dates">
+          <div><span class="muted">วันที่นัดรับ</span><b>{{ fmt(new Date(`${pickupDate}T00:00:00`)) }}</b></div>
+          <div class="arrow">→</div>
+          <div><span class="muted">กำหนดคืน</span><b>{{ reservationDueText }}</b></div>
         </div>
 
         <p class="lbl">วัตถุประสงค์การยืม</p>
         <textarea v-model="purpose" rows="3" placeholder="เช่น ใช้ประชุมลูกค้านอกสถานที่"></textarea>
 
-        <button class="btn submit" :disabled="submitting || selected.length === 0" @click="submitRequest">
-          {{ submitting ? 'กำลังส่ง...' : `ส่งคำขอยืม (${selected.length} รายการ)` }}
+        <button class="btn submit" :disabled="submitting || selected.length === 0 || (mode === 'reserve' && !pickupDate)" @click="submitRequest">
+          {{ submitting ? 'กำลังส่ง...' : mode === 'reserve' ? `จองทรัพย์สิน (${selected.length} รายการ)` : `ส่งคำขอยืม (${selected.length} รายการ)` }}
         </button>
       </aside>
+    </div>
+    <div v-if="historyAsset" class="history-overlay" role="presentation" @click.self="historyAsset = null">
+      <section class="history-dialog" role="dialog" aria-modal="true" :aria-label="`ประวัติ ${historyAsset.asset_name}`">
+        <header class="history-head">
+          <div><h3>ประวัติการยืม</h3><p>{{ historyAsset.asset_name }} · {{ historyAsset.asset_code }}</p></div>
+          <button type="button" class="history-close" aria-label="ปิด" @click="historyAsset = null">×</button>
+        </header>
+        <p v-if="historyLoading" class="empty">กำลังโหลดประวัติ...</p>
+        <p v-else-if="historyError" class="error-text">{{ historyError }}</p>
+        <p v-else-if="historyRows.length === 0" class="empty">ยังไม่มีประวัติการยืมทรัพย์สินชิ้นนี้</p>
+        <div v-else class="history-list">
+          <article v-for="h in historyRows" :key="h.borrow_id" class="history-entry">
+            <div class="history-entry-top">
+              <b>{{ h.first_name }} {{ h.last_name }}</b>
+              <span class="history-status">{{ HISTORY_STATUS[h.status] || h.status }}</span>
+            </div>
+            <p>ยืมเมื่อ {{ fmtBorrowedAt(h.borrowed_at) }}</p>
+            <p v-if="h.return_date">คืนเมื่อ {{ fmtBorrowedAt(h.return_date) }}</p>
+            <p v-if="h.condition_out">สภาพก่อนยืม: {{ h.condition_out }}</p>
+            <p v-if="h.condition_in">สภาพตอนคืน: {{ h.condition_in }}</p>
+            <b v-if="h.has_defect === 1 || h.has_defect === true" class="defect">พบตำหนิ</b>
+            <b v-else-if="h.has_defect === 0 || h.has_defect === false" class="good-condition">ไม่พบตำหนิ</b>
+            <span v-else class="uninspected">ยังไม่คืนหรือยังไม่ได้บันทึกสภาพ</span>
+          </article>
+        </div>
+      </section>
     </div>
   </section>
 </template>
 
 <style scoped>
 .head h2 { margin: 0 0 4px; }
+.reserve-date { display: flex; flex-direction: column; gap: 6px; }
+.reserve-date input { font: inherit; }
+.history-link { margin-top: 8px; padding: 5px 0; border: 0; background: none; color: var(--primary); font: inherit; font-size: 13px; cursor: pointer; }
+.history-link:hover { text-decoration: underline; }
+.history-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 18px; background: rgba(15, 23, 42, .52); }
+.history-dialog { width: min(620px, 100%); max-height: min(80vh, 760px); overflow: auto; padding: 22px; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.history-head, .history-entry-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.history-head { margin-bottom: 14px; }
+.history-head h3, .history-head p { margin: 0; }
+.history-head p { margin-top: 4px; color: var(--muted); }
+.history-close { border: 0; background: none; font-size: 28px; line-height: 1; cursor: pointer; color: var(--muted); }
+.history-entry { padding: 14px 0; border-top: 1px solid var(--line); }
+.history-entry p { margin: 7px 0 0; font-size: 14px; }
+.history-status { color: var(--muted); font-size: 13px; }
+.defect, .good-condition, .uninspected { display: inline-block; margin-top: 8px; font-size: 13px; }
+.defect { color: var(--danger); }
+.good-condition { color: var(--ok-text); }
+.uninspected { color: var(--muted); }
 .sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
 
 .toolbar { display: flex; gap: 10px; margin-bottom: 12px; }
@@ -235,6 +323,8 @@ onMounted(async () => {
 
 .item { background: #fff; border-radius: 14px; overflow: hidden; cursor: pointer; border: 2px solid transparent; box-shadow: 0 2px 10px rgba(0, 0, 0, .06); transition: transform .15s, box-shadow .15s, border-color .15s; display: flex; flex-direction: column; }
 .item:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(30, 61, 107, .15); }
+.item.unavailable { cursor: default; opacity: .82; }
+.item.unavailable:hover { transform: none; box-shadow: 0 2px 10px rgba(0, 0, 0, .06); }
 .item:focus-visible { outline: none; border-color: var(--primary); }
 .item.on { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43, 87, 151, .15); }
 /* รูปทุกใบสัดส่วนเดียวกัน แสดงเต็มภาพไม่โดนตัด */
@@ -247,6 +337,9 @@ onMounted(async () => {
 .info .bm { margin: 0 0 6px; font-size: 13px; color: var(--text); opacity: .75; }
 .info .meta { margin: 0 0 12px; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--muted); }
 .pickbtn { margin-top: auto; text-align: center; padding: 8px; border-radius: 9px; font-size: 14px; font-weight: 600; background: #eef3fb; color: var(--primary); transition: background .15s, color .15s; }
+.asset-status { width: fit-content; margin-bottom: 6px; padding: 3px 9px; border-radius: 999px; background: #eef1f6; color: #526075; font-size: 12px; }
+.asset-status.available { background: var(--ok-soft); color: var(--ok-text); }
+.asset-status.reserved, .asset-status.borrowed { background: var(--warn-soft); color: var(--warn-text); }
 .item:hover .pickbtn { background: #dfe9f8; }
 .item.on .pickbtn { background: var(--primary); color: #fff; }
 

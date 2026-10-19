@@ -20,7 +20,7 @@ const saving = ref(false);
 const deleting = ref(null);
 const formCard = ref(null);
 
-const STATUS_TH = { available: 'ว่าง', borrowed: 'ถูกยืม', repair: 'ส่งซ่อม', retired: 'จำหน่ายออก' };
+const STATUS_TH = { available: 'ว่าง', reserved: 'ถูกจอง', borrowed: 'ถูกยืม', repair: 'ส่งซ่อม', retired: 'จำหน่ายออก' };
 const todayStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 const money = (n) => (n == null || n === '' ? '-' : Number(n).toLocaleString('th-TH', { maximumFractionDigits: 0 }));
 
@@ -112,7 +112,7 @@ onMounted(load);
     <div class="page-head">
       <div>
         <h2>จัดการทรัพย์สิน</h2>
-        <p class="page-sub">ทั้งหมด {{ assets.length }} รายการ · ว่าง {{ statusCounts.available || 0 }} · ถูกยืม {{ statusCounts.borrowed || 0 }}</p>
+        <p class="page-sub">ทั้งหมด {{ assets.length }} รายการ · ว่าง {{ statusCounts.available || 0 }} · ถูกจอง {{ statusCounts.reserved || 0 }} · ถูกยืม {{ statusCounts.borrowed || 0 }}</p>
       </div>
       <button v-if="!showForm" class="btn" @click="openForm">+ เพิ่มทรัพย์สิน</button>
     </div>

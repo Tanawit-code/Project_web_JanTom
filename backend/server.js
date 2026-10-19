@@ -13,6 +13,7 @@ const returnRoutes = require('./routes/returns');
 const fineRoutes = require('./routes/fines');
 const notificationRoutes = require('./routes/notifications');
 const dashboardRoutes = require('./routes/dashboard');
+const { startDueReminderJob } = require('./utils/dueReminder');
 
 const app = express();
 app.use(cors());
@@ -36,3 +37,4 @@ app.use('/api/dashboard', dashboardRoutes);
 
 const PORT = process.env.PORT || 4100;
 app.listen(PORT, () => console.log(`Asset system API running on http://localhost:${PORT}`));
+startDueReminderJob();
