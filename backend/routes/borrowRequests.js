@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { bangkokToday, bangkokDatePlusDays, isValidCeDate } = require('../utils/dates');
 const { notifyAdmins } = require('../utils/notify');
 const { recordActivity } = require('../utils/activityLog');
+const { sendNotifyEmail } = require('../utils/mailer');
 
 function genBorrowCode() {
   const d = new Date();
@@ -126,6 +127,15 @@ router.post('/:id/pickup', requireAuth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+    const [[request]] = await conn.query(
+      `SELECT borrow_id, borrow_code, status, DATE_FORMAT(pickup_date, '%Y-%m-%d') AS pickup_date FROM BORROW_REQUEST
+       WHERE borrow_id = ? AND emp_id = ? FOR UPDATE`,
+      [req.params.id, req.user.emp_id]
+    );
+    if (!request || request.status !== 'reserved' || String(request.pickup_date).slice(0, 10) > bangkokToday()) {
+      await conn.rollback();
+      return res.status(409).json({ message: 'ยังไม่ถึงวันรับ หรือรายการจองนี้ไม่สามารถดำเนินการได้' });
+    }
     const [result] = await conn.query(
       `UPDATE BORROW_REQUEST SET status='pending' WHERE borrow_id=? AND emp_id=? AND status='reserved' AND pickup_date <= ?`,
       [req.params.id, req.user.emp_id, bangkokToday()]
@@ -134,12 +144,64 @@ router.post('/:id/pickup', requireAuth, async (req, res) => {
       await conn.rollback();
       return res.status(409).json({ message: 'ยังไม่ถึงวันรับ หรือรายการจองนี้ไม่สามารถดำเนินการได้' });
     }
+    await recordActivity(req, {
+      action: 'pickup', entityType: 'reservation', entityId: request.borrow_id,
+      summary: `รับทรัพย์สินตามการจอง ${request.borrow_code}`,
+      before: { status: 'reserved', pickup_date: String(request.pickup_date).slice(0, 10) },
+      after: { status: 'pending' },
+    }, conn);
     await conn.commit();
     res.json({ message: 'รับทรัพย์สินแล้ว ส่งคำขอยืมให้ผู้อนุมัติเรียบร้อย' });
   } catch (err) {
     await conn.rollback();
     console.error(err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  } finally { conn.release(); }
+});
+
+// Employees may withdraw only their own request while it is still awaiting approval.
+router.delete('/:id/pending', requireAuth, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[request]] = await conn.query(
+      `SELECT borrow_id, borrow_code, status, due_date, purpose FROM BORROW_REQUEST
+       WHERE borrow_id=? AND emp_id=? FOR UPDATE`,
+      [req.params.id, req.user.emp_id]
+    );
+    if (!request) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'ไม่พบคำขอยืมนี้' });
+    }
+    if (request.status !== 'pending') {
+      await conn.rollback();
+      return res.status(409).json({ message: 'ยกเลิกได้เฉพาะคำขอที่ยังรออนุมัติ' });
+    }
+    const [items] = await conn.query(
+      `SELECT a.asset_id, a.asset_name, a.asset_code FROM BORROW_DETAIL bd
+       JOIN ASSET a ON a.asset_id=bd.asset_id WHERE bd.borrow_id=?`,
+      [request.borrow_id]
+    );
+    const [updated] = await conn.query(
+      `UPDATE BORROW_REQUEST SET status='cancelled' WHERE borrow_id=? AND emp_id=? AND status='pending'`,
+      [request.borrow_id, req.user.emp_id]
+    );
+    if (!updated.affectedRows) {
+      await conn.rollback();
+      return res.status(409).json({ message: 'คำขอถูกดำเนินการไปแล้ว ไม่สามารถยกเลิกได้' });
+    }
+    await recordActivity(req, {
+      action: 'cancel', entityType: 'borrow_request', entityId: request.borrow_id,
+      summary: `ผู้ยืมยกเลิกคำขอ ${request.borrow_code}`,
+      before: { status: 'pending', due_date: request.due_date, purpose: request.purpose, items },
+      after: { status: 'cancelled' },
+    }, conn);
+    await conn.commit();
+    res.json({ message: 'ยกเลิกคำขอยืมแล้ว' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('[borrow-requests] cancel pending:', err);
+    res.status(500).json({ message: 'ยกเลิกคำขอยืมไม่สำเร็จ' });
   } finally { conn.release(); }
 });
 
@@ -151,6 +213,7 @@ router.get('/mine', requireAuth, async (req, res) => {
   for (const r of requests) {
     const [details] = await pool.query(
       `SELECT bd.detail_id, bd.asset_id, a.asset_name, a.asset_code,
+              DATE_FORMAT(bd.return_requested_at, '%Y-%m-%d %H:%i:%s') AS return_requested_at,
               rr.return_id, rr.return_date
        FROM BORROW_DETAIL bd
        JOIN ASSET a ON a.asset_id = bd.asset_id
@@ -324,6 +387,33 @@ router.put('/:id/decision', requireAuth, requireRole('approver', 'admin'), async
       after: { status: decision, note: note || null, items: borrowItems.map(({ status, ...item }) => ({ ...item, status: decision === 'approved' ? 'borrowed' : (borrowBefore.pickup_date ? 'available' : status) })) },
     }, conn);
     await conn.commit();
+
+    try {
+      const [[borrower]] = await pool.query(
+        'SELECT first_name, email FROM EMPLOYEE WHERE emp_id=?', [borrowBefore.emp_id]
+      );
+      if (borrower?.email) {
+        const approved = decision === 'approved';
+        const assetNames = borrowItems.map((item) => `${item.asset_name} (${item.asset_code})`).join(', ');
+        await sendNotifyEmail({
+          to: borrower.email,
+          subject: `${approved ? 'คำขอยืมได้รับอนุมัติ' : 'คำขอยืมไม่ได้รับอนุมัติ'}: ${borrowBefore.borrow_code}`,
+          heading: `เรียนคุณ${borrower.first_name || ''} คำขอยืมของคุณ${approved ? 'ได้รับอนุมัติแล้ว' : 'ไม่ได้รับอนุมัติ'}`,
+          lines: [
+            `เลขที่คำขอ: ${borrowBefore.borrow_code}`,
+            `ทรัพย์สิน: ${assetNames || '-'}`,
+            `กำหนดคืน: ${borrowBefore.due_date || '-'}`,
+            ...(!approved && note ? [`เหตุผล: ${note}`] : []),
+          ],
+          link: `${process.env.FRONTEND_URL || 'http://localhost:5180'}/my-borrows`,
+          linkText: 'ดูคำขอยืมของฉัน',
+        });
+      } else {
+        console.warn(`[borrow-requests] no email for borrower emp_id=${borrowBefore.emp_id}; decision email skipped`);
+      }
+    } catch (mailErr) {
+      console.error('[borrow-requests] decision email failed:', mailErr.message);
+    }
     res.json({ message: decision === 'approved' ? 'อนุมัติคำขอสำเร็จ' : 'ปฏิเสธคำขอสำเร็จ' });
   } catch (err) {
     await conn.rollback();

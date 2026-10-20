@@ -28,6 +28,7 @@ const manageItems = computed(() => {
   ];
   if (isAdmin.value) {
     items.push(
+      { to: '/admin/organization', icon: '⚙️', label: 'จัดการหมวดหมู่และแผนก' },
       { to: '/admin/activity-logs', icon: '🧾', label: 'บันทึกกิจกรรม' },
       { to: '/admin/fines', icon: '💸', label: 'จัดการค่าปรับ', badge: toReview.value },
       { to: '/admin/assets', icon: '🗂️', label: 'จัดการทรัพย์สิน' },

@@ -37,7 +37,7 @@ async function readAll() {
 function onDocClick(e) {
   if (root.value && !root.value.contains(e.target)) open.value = false;
 }
-const ICON = { fine_created: '⚠️', slip_submitted: '🧾', fine_paid: '✅', fine_rejected: '❌', fine_cancelled: '➖', reserve_created: '📦', borrow_request_created: '📝' };
+const ICON = { fine_created: '⚠️', slip_submitted: '🧾', fine_paid: '✅', fine_rejected: '❌', fine_cancelled: '➖', reserve_created: '📦', borrow_request_created: '📝', return_requested: '📥' };
 
 onMounted(() => {
   refreshCount();

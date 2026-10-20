@@ -22,7 +22,7 @@ const outstanding = computed(() => fines.value.filter((f) => f.status === 'unpai
 const unpaidCount = computed(() => fines.value.filter((f) => f.status === 'unpaid').length);
 
 function state(id) {
-  if (!ui[id]) ui[id] = { open: false, qrUrl: '', qrName: '', qrErr: '', qrLoading: false, file: null, preview: '', uploading: false, msg: '', err: '' };
+  if (!ui[id]) ui[id] = { open: false, qrUrl: '', qrName: '', qrAmount: null, qrErr: '', qrLoading: false, file: null, preview: '', uploading: false, msg: '', err: '' };
   return ui[id];
 }
 
@@ -43,6 +43,7 @@ async function togglePay(f, forceOpen = false) {
     try {
       const { data } = await api.get(`/fines/${f.fine_id}/qr`);
       s.qrName = data.account_name;
+      s.qrAmount = Number(data.amount);
       s.qrUrl = await QRCode.toDataURL(data.payload, { width: 280, margin: 1, errorCorrectionLevel: 'M' });
     } catch (e) {
       s.qrErr = e.response?.data?.message || 'สร้าง QR ไม่สำเร็จ';
@@ -141,7 +142,7 @@ onMounted(() => {
               <div v-else-if="state(f.fine_id).qrUrl" class="qr">
                 <img :src="state(f.fine_id).qrUrl" alt="QR PromptPay" />
                 <div class="qr-info">
-                  <div class="qr-amount">฿{{ money(f.amount) }}</div>
+                  <div class="qr-amount">฿{{ money(state(f.fine_id).qrAmount ?? f.amount) }}</div>
                   <div v-if="state(f.fine_id).qrName" class="hint">ชื่อบัญชี: {{ state(f.fine_id).qrName }}</div>
                   <div class="hint">PromptPay</div>
                 </div>

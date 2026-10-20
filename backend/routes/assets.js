@@ -98,18 +98,60 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
 router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const { asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url } = req.body;
   if (badPurchaseDate(purchase_date)) return res.status(400).json({ message: BAD_PURCHASE_DATE });
-  const [[before]] = await pool.query('SELECT asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url FROM ASSET WHERE asset_id=?', [req.params.id]);
-  if (!before) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
-  const [result] = await pool.query(
-    `UPDATE ASSET SET asset_name=?, brand=?, model=?, serial_number=?, purchase_date=?, price=?, status=?, location=?, cat_id=?, image_url=?
-     WHERE asset_id=?`,
-    [asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url || null, req.params.id]
-  );
-  if (result.affectedRows === 0) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
-  await recordActivity(req, { action: 'update', entityType: 'asset', entityId: req.params.id,
-    summary: `แก้ไขทรัพย์สิน ${before.asset_name} (${before.asset_code})`, before,
-    after: { asset_code: before.asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url: image_url || null } });
-  res.json({ message: 'แก้ไขทรัพย์สินสำเร็จ' });
+  const allowedStatuses = ['available', 'reserved', 'borrowed', 'repair', 'retired'];
+  if (!allowedStatuses.includes(status)) return res.status(400).json({ message: 'สถานะทรัพย์สินไม่ถูกต้อง' });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[before]] = await conn.query(
+      'SELECT asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url FROM ASSET WHERE asset_id=? FOR UPDATE',
+      [req.params.id]
+    );
+    if (!before) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
+    }
+
+    // Asset status is also used to reserve/borrow inventory. Do not let an admin
+    // edit silently clear an active request; the decision/return/cancel flows own those transitions.
+    if (status !== before.status) {
+      const [[active]] = await conn.query(
+        `SELECT br.borrow_code, br.status
+         FROM BORROW_DETAIL bd
+         JOIN BORROW_REQUEST br ON br.borrow_id = bd.borrow_id
+         LEFT JOIN RETURN_RECORD rr ON rr.detail_id = bd.detail_id
+         WHERE bd.asset_id = ?
+           AND br.status IN ('pending', 'reserved', 'approved')
+           AND rr.return_id IS NULL
+         LIMIT 1`,
+        [req.params.id]
+      );
+      if (active) {
+        await conn.rollback();
+        return res.status(409).json({
+          message: `เปลี่ยนสถานะไม่ได้ เนื่องจากมีคำขอหรือรายการยืมที่ยังดำเนินการอยู่ (${active.borrow_code})`,
+        });
+      }
+    }
+
+    await conn.query(
+      `UPDATE ASSET SET asset_name=?, brand=?, model=?, serial_number=?, purchase_date=?, price=?, status=?, location=?, cat_id=?, image_url=?
+       WHERE asset_id=?`,
+      [asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url || null, req.params.id]
+    );
+    await recordActivity(req, { action: 'update', entityType: 'asset', entityId: req.params.id,
+      summary: `แก้ไขทรัพย์สิน ${before.asset_name} (${before.asset_code})`, before,
+      after: { asset_code: before.asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url: image_url || null } }, conn);
+    await conn.commit();
+    res.json({ message: 'แก้ไขทรัพย์สินสำเร็จ' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('[assets:update]', err);
+    res.status(500).json({ message: 'แก้ไขทรัพย์สินไม่สำเร็จ' });
+  } finally {
+    conn.release();
+  }
 });
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {

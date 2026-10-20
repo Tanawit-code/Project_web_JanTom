@@ -7,6 +7,7 @@ import ApproveRegistration from '../views/ApproveRegistration.vue';
 import ForgotPassword from '../views/ForgotPassword.vue';
 import ResetPassword from '../views/ResetPassword.vue';
 import Home from '../views/Home.vue';
+import Landing from '../views/Landing.vue';
 import Assets from '../views/Assets.vue';
 import AssetDetails from '../views/AssetDetails.vue';
 import MyBorrows from '../views/MyBorrows.vue';
@@ -25,6 +26,7 @@ import ConfirmPasswordChange from '../views/ConfirmPasswordChange.vue';
 import AdminReports from '../views/admin/AdminReports.vue';
 import AdminReservations from '../views/admin/AdminReservations.vue';
 import AdminActivityLogs from '../views/admin/AdminActivityLogs.vue';
+import AdminOrganization from '../views/admin/AdminOrganization.vue';
 
 const routes = [
   { path: '/login', component: Login },
@@ -34,7 +36,7 @@ const routes = [
   { path: '/confirm-email-change', component: ConfirmEmailChange },
   { path: '/confirm-password-change', component: ConfirmPasswordChange },
   { path: '/approve-registration', component: ApproveRegistration, meta: { requiresRole: ['admin'] } },
-  { path: '/', component: Home, meta: { requiresAuth: true } },
+  { path: '/', component: Landing },
   { path: '/assets', component: Assets, meta: { requiresAuth: true } },
   { path: '/assets/:id', component: AssetDetails, meta: { requiresAuth: true } },
   { path: '/my-borrows', component: MyBorrows, meta: { requiresAuth: true } },
@@ -45,6 +47,7 @@ const routes = [
   { path: '/admin/reservations', component: AdminReservations, meta: { requiresRole: ['admin'] } },
   { path: '/admin/dashboard', component: AdminDashboard, meta: { requiresRole: ['admin'] } },
   { path: '/admin/activity-logs', component: AdminActivityLogs, meta: { requiresRole: ['admin'] } },
+  { path: '/admin/organization', component: AdminOrganization, meta: { requiresRole: ['admin'] } },
   { path: '/admin/fines', component: AdminFines, meta: { requiresRole: ['admin'] } },
   { path: '/admin/repairs', component: AdminRepairs, meta: { requiresRole: ['admin', 'approver'] } },
   { path: '/admin/employees', component: AdminEmployees, meta: { requiresRole: ['admin'] } },

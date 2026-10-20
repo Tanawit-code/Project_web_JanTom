@@ -6,6 +6,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validatePasswordStrength } = require('../utils/password');
+const { recordActivity } = require('../utils/activityLog');
 const { sendApprovalRequestEmail, sendRegistrationResultEmail, sendResetEmail, sendEmailChangeConfirmation, sendPasswordChangeConfirmation } = require('../utils/mailer');
 require('dotenv').config();
 
@@ -75,13 +76,19 @@ router.post('/register', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const token = crypto.randomBytes(32).toString('hex'); // ส่งทางอีเมล ไม่เก็บตัวจริงใน DB
     try {
-      await pool.query(
+      const [created] = await pool.query(
         `INSERT INTO EMPLOYEE
            (emp_code, first_name, last_name, email, username, password_hash, role,
             status, approval_token_hash, approval_expires)
          VALUES (?,?,?,?,?,?, 'employee', 'pending', ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
         [emp_code, first_name, last_name, email, username, hash, sha256(token), TOKEN_TTL_DAYS]
       );
+      await recordActivity(req, {
+        actor: { emp_id: created.insertId, username },
+        action: 'register', entityType: 'employee_registration', entityId: created.insertId,
+        summary: `ส่งคำขอสมัครสมาชิก ${username}`,
+        after: { emp_code, first_name, last_name, email, username, status: 'pending' },
+      });
     } catch (err) {
       if (err.code === 'ER_DUP_ENTRY') {
         return res.status(409).json({ message: 'รหัสพนักงาน อีเมล หรือ username นี้ถูกใช้งานแล้ว' });
@@ -150,6 +157,13 @@ router.post('/registration/:token', requireAuth, requireRole('admin'), async (re
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'ลิงก์ถูกใช้ไปแล้ว' });
     }
+    await recordActivity(req, {
+      action: action === 'approve' ? 'approve' : 'reject',
+      entityType: 'employee_registration', entityId: emp_id,
+      summary: `${action === 'approve' ? 'อนุมัติ' : 'ปฏิเสธ'}การสมัคร ${email}`,
+      before: { emp_id, email, status: 'pending' },
+      after: { status: action === 'approve' ? 'active' : 'rejected' },
+    });
 
     // อนุมัติ/ปฏิเสธเสร็จแล้ว -> ส่งอีเมลแจ้งผู้สมัคร (ถ้าส่งไม่ได้ก็ไม่ทำให้การอนุมัติล้มเหลว)
     let emailSent = false;
@@ -227,12 +241,24 @@ router.post('/reset-password', async (req, res) => {
     if (!check.valid) return res.status(400).json({ message: check.message });
 
     const hash = await bcrypt.hash(newPassword, 10);
+    const tokenHash = sha256(String(token));
+    const [[account]] = await pool.query(
+      `SELECT emp_id, username FROM EMPLOYEE
+       WHERE reset_token_hash = ? AND reset_expires > NOW() AND status = 'active'`,
+      [tokenHash]
+    );
     // อัปเดตแบบ atomic และล้าง token ทันที ใช้ลิงก์ได้ครั้งเดียว
     const [result] = await pool.query(
       `UPDATE EMPLOYEE SET password_hash = ?, reset_token_hash = NULL, reset_expires = NULL
        WHERE reset_token_hash = ? AND reset_expires > NOW() AND status = 'active'`,
-      [hash, sha256(String(token))]
+      [hash, tokenHash]
     );
+    if (result.affectedRows > 0 && account) await recordActivity(req, {
+      actor: { emp_id: account.emp_id, username: account.username },
+      action: 'password_reset', entityType: 'employee', entityId: account.emp_id,
+      summary: `รีเซ็ตรหัสผ่านบัญชี ${account.username}`,
+      after: { password_changed: true, method: 'email_reset' },
+    });
     if (result.affectedRows === 0) {
       return res.status(400).json({ message: 'ลิงก์ไม่ถูกต้อง ถูกใช้ไปแล้ว หรือหมดอายุ กรุณาขอลิงก์ใหม่' });
     }
@@ -344,11 +370,17 @@ router.post('/profile/email-change', requireAuth, async (req, res) => {
 router.get('/confirm-email-change/:token', async (req, res) => {
   try {
     const tokenHash = sha256(req.params.token);
-    const [rows] = await pool.query("SELECT emp_id, pending_email FROM EMPLOYEE WHERE email_change_token_hash = ? AND email_change_expires > NOW() AND status = 'active'", [tokenHash]);
+    const [rows] = await pool.query("SELECT emp_id, username, email, pending_email FROM EMPLOYEE WHERE email_change_token_hash = ? AND email_change_expires > NOW() AND status = 'active'", [tokenHash]);
     if (!rows.length) return res.status(400).json({ message: 'ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุแล้ว' });
     const { emp_id, pending_email } = rows[0];
     const [result] = await pool.query('UPDATE EMPLOYEE SET email = ?, pending_email = NULL, email_change_token_hash = NULL, email_change_expires = NULL WHERE emp_id = ? AND email_change_token_hash = ?', [pending_email, emp_id, tokenHash]);
     if (!result.affectedRows) return res.status(400).json({ message: 'ลิงก์ยืนยันนี้ถูกใช้ไปแล้ว' });
+    await recordActivity(req, {
+      actor: { emp_id, username: rows[0].username },
+      action: 'email_changed', entityType: 'employee', entityId: emp_id,
+      summary: `เปลี่ยนอีเมลบัญชี ${rows[0].username}`,
+      before: { email: rows[0].email }, after: { email: pending_email },
+    });
     res.json({ message: 'ยืนยันและเปลี่ยนอีเมลเรียบร้อยแล้ว', email: pending_email });
   } catch (err) {
     console.error(err);

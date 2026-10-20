@@ -5,8 +5,8 @@ import api from '../../services/api';
 const rows = ref([]); const page = ref(1); const limit = 25; const total = ref(0);
 const search = ref(''); const action = ref(''); const loading = ref(false); const error = ref('');
 const pages = computed(() => Math.max(1, Math.ceil(total.value / limit)));
-const actionNames = { approve: 'อนุมัติ', reject: 'ปฏิเสธ', create: 'สร้าง', update: 'แก้ไข', delete: 'ลบ', cancel: 'ยกเลิก' };
-const entityNames = { borrow_request: 'คำขอยืม', reservation: 'การจอง', asset: 'ทรัพย์สิน', employee: 'พนักงาน', category: 'หมวดหมู่', department: 'แผนก', fine: 'ค่าปรับ' };
+const actionNames = { approve: 'อนุมัติ', reject: 'ปฏิเสธ', create: 'สร้าง', update: 'แก้ไข', delete: 'ลบ', cancel: 'ยกเลิก', register: 'สมัครสมาชิก', pickup: 'รับอุปกรณ์', return: 'รับคืน', slip_submitted: 'ส่งสลิป', payment_auto_verified: 'ยืนยันชำระอัตโนมัติ', password_reset: 'รีเซ็ตรหัสผ่าน', email_changed: 'เปลี่ยนอีเมล', qr_created: 'สร้าง QR ชำระเงิน' };
+const entityNames = { borrow_request: 'คำขอยืม', reservation: 'การจอง', borrow_detail: 'รายการทรัพย์สินที่ยืม', repair: 'งานซ่อม', employee_registration: 'คำขอสมัครสมาชิก', asset: 'ทรัพย์สิน', employee: 'พนักงาน', category: 'หมวดหมู่', department: 'แผนก', fine: 'ค่าปรับ' };
 async function load() {
   loading.value = true; error.value = '';
   try {
@@ -26,7 +26,7 @@ onMounted(load);
     <div class="page-head"><div><h2>บันทึกกิจกรรม</h2><p class="page-sub">ตรวจสอบผู้ดำเนินการ รายการที่เปลี่ยนแปลง และเวลา</p></div><button class="btn secondary" :disabled="loading" @click="load">รีเฟรช</button></div>
     <div class="card filters">
       <input v-model="search" class="filter-input" placeholder="ค้นหาผู้ใช้ รายการ หรือรหัสข้อมูล" @keyup.enter="applyFilter">
-      <select v-model="action" class="filter-input" @change="applyFilter"><option value="">ทุกกิจกรรม</option><option value="approve">อนุมัติ</option><option value="reject">ปฏิเสธ</option><option value="create">สร้าง</option><option value="update">แก้ไข</option><option value="delete">ลบ</option><option value="cancel">ยกเลิก</option></select>
+      <select v-model="action" class="filter-input" @change="applyFilter"><option value="">ทุกกิจกรรม</option><option value="approve">อนุมัติ</option><option value="reject">ปฏิเสธ</option><option value="create">สร้าง</option><option value="register">สมัครสมาชิก</option><option value="update">แก้ไข</option><option value="delete">ลบ</option><option value="cancel">ยกเลิก</option><option value="pickup">รับอุปกรณ์</option><option value="return">รับคืน</option><option value="slip_submitted">ส่งสลิป</option><option value="payment_auto_verified">ยืนยันชำระอัตโนมัติ</option><option value="qr_created">สร้าง QR ชำระเงิน</option><option value="email_changed">เปลี่ยนอีเมล</option><option value="password_reset">รีเซ็ตรหัสผ่าน</option></select>
       <button class="btn primary" @click="applyFilter">ค้นหา</button>
     </div>
     <p v-if="error" class="error-text">{{ error }}</p>

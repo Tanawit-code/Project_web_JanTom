@@ -4,6 +4,8 @@ const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { bangkokToday } = require('../utils/dates');
 const { FINE_TYPES, TYPE_LABEL, FINE_PER_DAY, calculateLateFine, createFine, emailFineCreated } = require('../utils/fines');
+const { recordActivity } = require('../utils/activityLog');
+const { notifyAdmins } = require('../utils/notify');
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : '');
 
@@ -13,6 +15,7 @@ router.get('/pending', requireAuth, requireRole('admin', 'approver'), async (req
   try {
     const [rows] = await pool.query(
       `SELECT bd.detail_id, bd.borrow_id, br.borrow_code, br.due_date,
+              DATE_FORMAT(bd.return_requested_at, '%Y-%m-%d %H:%i:%s') AS return_requested_at,
               DATEDIFF(?, br.due_date) AS days_overdue,
               a.asset_id, a.asset_name, a.asset_code,
               e.first_name, e.last_name, e.emp_code
@@ -22,7 +25,7 @@ router.get('/pending', requireAuth, requireRole('admin', 'approver'), async (req
        JOIN EMPLOYEE e ON e.emp_id = br.emp_id
        LEFT JOIN RETURN_RECORD rr ON rr.detail_id = bd.detail_id
        WHERE br.status = 'approved' AND rr.return_id IS NULL
-       ORDER BY br.due_date ASC`,
+       ORDER BY (bd.return_requested_at IS NULL) ASC, bd.return_requested_at ASC, br.due_date ASC`,
       [bangkokToday()]
     );
     res.json(rows.map((r) => {
@@ -32,6 +35,70 @@ router.get('/pending', requireAuth, requireRole('admin', 'approver'), async (req
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// Employee notifies admins that a borrowed item is ready to be returned.
+router.post('/request', requireAuth, async (req, res) => {
+  const detailId = Number(req.body.detail_id);
+  if (!Number.isInteger(detailId) || detailId < 1) {
+    return res.status(400).json({ message: 'กรุณาระบุรายการทรัพย์สินที่ต้องการแจ้งคืน' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[item]] = await conn.query(
+      `SELECT bd.detail_id, bd.return_requested_at, br.borrow_id, br.borrow_code,
+              br.status AS borrow_status, a.asset_id, a.asset_name, a.asset_code
+       FROM BORROW_DETAIL bd
+       JOIN BORROW_REQUEST br ON br.borrow_id = bd.borrow_id
+       JOIN ASSET a ON a.asset_id = bd.asset_id
+       LEFT JOIN RETURN_RECORD rr ON rr.detail_id = bd.detail_id
+       WHERE bd.detail_id = ? AND br.emp_id = ? AND rr.return_id IS NULL
+       FOR UPDATE`,
+      [detailId, req.user.emp_id]
+    );
+    if (!item || item.borrow_status !== 'approved') {
+      await conn.rollback();
+      return res.status(404).json({ message: 'ไม่พบรายการยืมที่ยังสามารถแจ้งคืนได้' });
+    }
+    if (item.return_requested_at) {
+      await conn.rollback();
+      return res.status(409).json({ message: 'รายการนี้แจ้งคืนไปแล้ว รอแอดมินตรวจรับ' });
+    }
+
+    await conn.query('UPDATE BORROW_DETAIL SET return_requested_at = NOW() WHERE detail_id = ?', [detailId]);
+    await recordActivity(req, {
+      action: 'return_requested', entityType: 'borrow_detail', entityId: detailId,
+      summary: `แจ้งคืน ${item.asset_name} (${item.asset_code}) ตามคำขอ ${item.borrow_code}`,
+      before: { return_requested_at: null, borrow_status: item.borrow_status },
+      after: { return_requested: true, borrow_code: item.borrow_code, asset_id: item.asset_id,
+        asset_name: item.asset_name, asset_code: item.asset_code },
+    }, conn);
+    await conn.commit();
+
+    try {
+      const [[employee]] = await pool.query(
+        'SELECT first_name, last_name FROM EMPLOYEE WHERE emp_id = ?', [req.user.emp_id]
+      );
+      await notifyAdmins(pool, {
+        type: 'return_requested',
+        title: 'พนักงานแจ้งคืนทรัพย์สิน',
+        message: `${employee?.first_name || ''} ${employee?.last_name || ''} · ${item.borrow_code} · ${item.asset_name} (${item.asset_code})`,
+        link: '/admin/returns',
+      });
+    } catch (notifyErr) {
+      console.error('[returns] admin notification failed:', notifyErr.message);
+    }
+
+    res.json({ message: 'ส่งแจ้งคืนแล้ว รอแอดมินตรวจรับทรัพย์สิน' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('[returns:request]', err);
+    res.status(500).json({ message: 'แจ้งคืนทรัพย์สินไม่สำเร็จ' });
+  } finally {
+    conn.release();
   }
 });
 
@@ -49,9 +116,11 @@ router.post('/', requireAuth, requireRole('admin', 'approver'), async (req, res)
     await conn.beginTransaction();
 
     const [[detail]] = await conn.query(
-      `SELECT bd.*, br.borrow_id, br.emp_id, br.due_date,
+      `SELECT bd.*, br.borrow_id, br.borrow_code, br.emp_id, br.due_date,
+              a.asset_name, a.asset_code,
               GREATEST(DATEDIFF(?, br.due_date), 0) AS days_late
        FROM BORROW_DETAIL bd JOIN BORROW_REQUEST br ON br.borrow_id = bd.borrow_id
+       JOIN ASSET a ON a.asset_id = bd.asset_id
        WHERE bd.detail_id = ?`,
       [bangkokToday(), detail_id]
     );
@@ -68,7 +137,7 @@ router.post('/', requireAuth, requireRole('admin', 'approver'), async (req, res)
       return res.status(400).json({ message: 'จำนวนค่าปรับไม่ถูกต้อง' });
     }
 
-    await conn.query(
+    const [returnResult] = await conn.query(
       `INSERT INTO RETURN_RECORD (condition_in, fine_amount, detail_id, received_by) VALUES (?,?,?,?)`,
       [condition_in || null, fineAmt, detail_id, req.user.emp_id]
     );
@@ -98,6 +167,14 @@ router.post('/', requireAuth, requireRole('admin', 'approver'), async (req, res)
     if (returnedCount >= total) {
       await conn.query(`UPDATE BORROW_REQUEST SET status='returned' WHERE borrow_id=?`, [detail.borrow_id]);
     }
+
+    await recordActivity(req, {
+      action: 'return', entityType: 'borrow_detail', entityId: detail_id,
+      summary: `รับคืน ${detail.asset_name} (${detail.asset_code}) จาก ${detail.borrow_code}`,
+      before: { borrow_code: detail.borrow_code, asset_id: detail.asset_id, asset_name: detail.asset_name, asset_code: detail.asset_code, status: 'borrowed' },
+      after: { return_id: returnResult.insertId, condition_in: condition_in || null, fine_amount: fineAmt,
+        request_status: returnedCount >= total ? 'returned' : 'approved' },
+    }, conn);
 
     await conn.commit();
     fineInfos.forEach((info) => emailFineCreated(info.emp_id, info));

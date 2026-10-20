@@ -88,6 +88,7 @@ CREATE TABLE `borrow_detail` (
   `detail_id` int(11) NOT NULL,
   `condition_out` varchar(255) DEFAULT NULL,
   `detail_note` varchar(255) DEFAULT NULL,
+  `return_requested_at` datetime DEFAULT NULL,
   `borrow_id` int(11) NOT NULL,
   `asset_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -181,6 +182,11 @@ CREATE TABLE `fine` (
   `detail_id` int(11) DEFAULT NULL,
   `fine_type` enum('late','damaged','other') NOT NULL,
   `amount` decimal(10,2) NOT NULL,
+  `qr_amount` decimal(10,2) DEFAULT NULL,
+  `qr_promptpay_id` varchar(32) DEFAULT NULL,
+  `qr_account_name` varchar(100) DEFAULT NULL,
+  `qr_payload` text NULL,
+  `qr_created_at` datetime DEFAULT NULL,
   `reason` varchar(255) NOT NULL,
   `status` enum('unpaid','slip_submitted','paid','cancelled') NOT NULL DEFAULT 'unpaid',
   `slip_file` varchar(255) DEFAULT NULL,
@@ -270,7 +276,8 @@ ALTER TABLE `asset_category`
 ALTER TABLE `borrow_detail`
   ADD PRIMARY KEY (`detail_id`),
   ADD KEY `borrow_id` (`borrow_id`),
-  ADD KEY `asset_id` (`asset_id`);
+  ADD KEY `asset_id` (`asset_id`),
+  ADD KEY `idx_borrow_detail_return_requested` (`return_requested_at`);
 
 --
 -- Indexes for table `borrow_request`

@@ -11,6 +11,7 @@ const search = ref('');
 
 const money = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-');
+const fmtDateTime = (d) => (d ? new Date(String(d).replace(' ', 'T')).toLocaleString('th-TH') : '-');
 
 async function load() {
   try {
@@ -108,6 +109,7 @@ onMounted(load);
         <span>👤 {{ item.first_name }} {{ item.last_name }} <small>({{ item.emp_code }})</small></span>
         <span>🧾 {{ item.borrow_code }}</span>
         <span>📅 ครบกำหนด {{ fmt(item.due_date) }}</span>
+        <span v-if="item.return_requested_at" class="return-request-tag">🔔 แจ้งคืนเมื่อ {{ fmtDateTime(item.return_requested_at) }}</span>
       </div>
 
       <div v-if="forms[item.detail_id]" class="form">
@@ -156,6 +158,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .status.ok { background: var(--ok-soft); color: var(--ok-text); font-weight: 600; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 8px; font-size: 13.5px; color: var(--muted); }
 .meta small { color: var(--muted); }
+.return-request-tag { color: #8a5a00; font-weight: 700; }
 .form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--line-strong); }
 .form .full { grid-column: 1 / -1; }
 .form input, .form select { margin: 0; }

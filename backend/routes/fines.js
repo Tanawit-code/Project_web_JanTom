@@ -78,20 +78,67 @@ router.get('/mine/summary', requireAuth, h(async (req, res) => {
 
 // QR PromptPay ตามยอดค่าปรับ (เจ้าของรายการหรือ admin เท่านั้น)
 router.get('/:id/qr', requireAuth, h(async (req, res) => {
-  const [[fine]] = await pool.query('SELECT emp_id, amount, status, fine_code FROM FINE WHERE fine_id = ?', [req.params.id]);
-  if (!fine) return res.status(404).json({ message: 'ไม่พบรายการค่าปรับ' });
-  if (req.user.role !== 'admin' && fine.emp_id !== req.user.emp_id) return res.status(403).json({ message: 'ไม่มีสิทธิ์' });
-  if (fine.status !== 'unpaid') return res.status(409).json({ message: 'รายการนี้ไม่ได้อยู่ในสถานะรอชำระ' });
-  if (!process.env.PROMPTPAY_ID) {
-    return res.status(503).json({ message: 'ระบบยังไม่ได้ตั้งค่าบัญชีรับชำระเงิน กรุณาติดต่อผู้ดูแลระบบ' });
-  }
-  let payload;
-  try { payload = buildPromptPayPayload(process.env.PROMPTPAY_ID, Number(fine.amount)); }
-  catch (e) { console.error('[fines] promptpay:', e.message); return res.status(503).json({ message: 'ตั้งค่าบัญชีรับชำระเงินไม่ถูกต้อง กรุณาติดต่อผู้ดูแลระบบ' }); }
-  res.json({ payload, amount: Number(fine.amount), account_name: process.env.PROMPTPAY_NAME || '', fine_code: fine.fine_code });
-}));
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[fine]] = await conn.query(
+      `SELECT emp_id, amount, status, fine_code, qr_amount, qr_promptpay_id, qr_account_name, qr_payload,
+              DATE_FORMAT(qr_created_at, '%Y-%m-%d %H:%i:%s') AS qr_created_at
+       FROM FINE WHERE fine_id = ? FOR UPDATE`, [req.params.id]
+    );
+    if (!fine) { await conn.rollback(); return res.status(404).json({ message: 'ไม่พบรายการค่าปรับ' }); }
+    if (req.user.role !== 'admin' && fine.emp_id !== req.user.emp_id) {
+      await conn.rollback(); return res.status(403).json({ message: 'ไม่มีสิทธิ์' });
+    }
+    if (fine.status !== 'unpaid') {
+      await conn.rollback(); return res.status(409).json({ message: 'รายการนี้ไม่ได้อยู่ในสถานะรอชำระ' });
+    }
 
-// จำกัดจำนวนครั้งที่ส่งตรวจต่อรายการ (กันเปลืองโควต้า API ของผู้ให้บริการตรวจสลิป)
+    let snapshot = fine;
+    if (!fine.qr_payload) {
+      const promptpayId = process.env.PROMPTPAY_ID;
+      if (!promptpayId) {
+        await conn.rollback();
+        return res.status(503).json({ message: 'ระบบยังไม่ได้ตั้งค่าบัญชีรับชำระเงิน กรุณาติดต่อผู้ดูแลระบบ' });
+      }
+      let payload;
+      try { payload = buildPromptPayPayload(promptpayId, Number(fine.amount)); }
+      catch (e) {
+        console.error('[fines] promptpay:', e.message);
+        await conn.rollback();
+        return res.status(503).json({ message: 'ตั้งค่าบัญชีรับชำระเงินไม่ถูกต้อง กรุณาติดต่อผู้ดูแลระบบ' });
+      }
+      const accountName = process.env.PROMPTPAY_NAME || '';
+      await conn.query(
+        `UPDATE FINE SET qr_amount=?, qr_promptpay_id=?, qr_account_name=?, qr_payload=?, qr_created_at=NOW()
+         WHERE fine_id=?`,
+        [fine.amount, promptpayId, accountName || null, payload, req.params.id]
+      );
+      await recordActivity(req, {
+        action: 'qr_created', entityType: 'fine', entityId: req.params.id,
+        summary: `สร้าง QR ชำระค่าปรับ ${fine.fine_code}`,
+        after: { amount: Number(fine.amount), promptpay_id: promptpayId, account_name: accountName || null },
+      }, conn);
+      const [[created]] = await conn.query(
+        `SELECT DATE_FORMAT(qr_created_at, '%Y-%m-%d %H:%i:%s') AS qr_created_at FROM FINE WHERE fine_id=?`,
+        [req.params.id]
+      );
+      snapshot = { ...fine, qr_amount: fine.amount, qr_promptpay_id: promptpayId,
+        qr_account_name: accountName, qr_payload: payload, qr_created_at: created.qr_created_at };
+    }
+    await conn.commit();
+    res.json({
+      payload: snapshot.qr_payload,
+      amount: Number(snapshot.qr_amount),
+      account_name: snapshot.qr_account_name || '',
+      fine_code: fine.fine_code,
+      qr_created_at: snapshot.qr_created_at || null,
+    });
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally { conn.release(); }
+}));
 const attempts = new Map();
 function tooManyAttempts(fineId) {
   const now = Date.now();
@@ -167,6 +214,15 @@ router.post('/:id/slip', requireAuth, (req, res) => {
         throw e;
       }
       if (upd.affectedRows === 0) { cleanup(); return res.status(409).json({ message: 'ไม่สามารถแนบสลิปได้ กรุณารีเฟรชหน้า' }); }
+
+      await recordActivity(req, {
+        action: approve ? 'payment_auto_verified' : 'slip_submitted',
+        entityType: 'fine', entityId: id,
+        summary: `${approve ? 'ระบบยืนยันการชำระจากสลิป' : 'ส่งสลิปชำระค่าปรับ'} ${fine.fine_code}`,
+        before: { status: 'unpaid', amount: Number(fine.amount), emp_id: fine.emp_id },
+        after: { status: approve ? 'paid' : 'slip_submitted', verify_result: outcome.verify_result || null,
+          trans_ref: outcome.transRef || null },
+      });
 
       const [[emp]] = await pool.query('SELECT first_name, last_name, email FROM EMPLOYEE WHERE emp_id = ?', [req.user.emp_id]);
       const who = emp ? `${emp.first_name} ${emp.last_name}` : 'พนักงาน';

@@ -6,7 +6,7 @@ function safeJson(value) {
 }
 
 async function recordActivity(req, entry, db = pool) {
-  const user = req.user || {};
+  const user = req.user || entry.actor || {};
   const actorName = user.username || `employee#${user.emp_id || 'unknown'}`;
   await db.query(
     `INSERT INTO ACTIVITY_LOG

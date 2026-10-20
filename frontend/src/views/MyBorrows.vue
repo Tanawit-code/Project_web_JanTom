@@ -7,6 +7,10 @@ const loading = ref(true);
 const filter = ref('all');
 const actionError = ref('');
 const submitting = ref(null);
+const returnSubmitting = ref(null);
+const cancelTarget = ref(null);
+const cancelSuccess = ref('');
+const returnSuccess = ref('');
 
 async function load() {
   try { requests.value = (await api.get('/borrow-requests/mine')).data; }
@@ -25,6 +29,36 @@ async function pickup(r) {
   } finally { submitting.value = null; }
 }
 
+async function cancelRequest() {
+  const request = cancelTarget.value;
+  if (!request) return;
+  actionError.value = '';
+  cancelSuccess.value = '';
+  submitting.value = request.borrow_id;
+  try {
+    const { data } = await api.delete(`/borrow-requests/${request.borrow_id}/pending`);
+    cancelTarget.value = null;
+    cancelSuccess.value = data.message;
+    await load();
+  } catch (e) {
+    actionError.value = e.response?.data?.message || 'ยกเลิกคำขอยืมไม่สำเร็จ';
+    cancelTarget.value = null;
+  } finally { submitting.value = null; }
+}
+
+async function requestReturn(item) {
+  actionError.value = '';
+  returnSuccess.value = '';
+  returnSubmitting.value = item.detail_id;
+  try {
+    const { data } = await api.post('/returns/request', { detail_id: item.detail_id });
+    returnSuccess.value = data.message;
+    await load();
+  } catch (e) {
+    actionError.value = e.response?.data?.message || 'ส่งแจ้งคืนไม่สำเร็จ';
+  } finally { returnSubmitting.value = null; }
+}
+
 const STATUS_TH = { pending: 'รออนุมัติ', reserved: 'ถูกจอง', approved: 'อนุมัติแล้ว', rejected: 'ถูกปฏิเสธ', returned: 'คืนแล้ว', cancelled: 'ยกเลิก' };
 const FILTERS = [
   { key: 'all', label: 'ทั้งหมด' },
@@ -33,6 +67,7 @@ const FILTERS = [
   { key: 'approved', label: 'กำลังยืม' },
   { key: 'returned', label: 'คืนแล้ว' },
   { key: 'rejected', label: 'ไม่อนุมัติ' },
+  { key: 'cancelled', label: 'ยกเลิกแล้ว' },
 ];
 const counts = computed(() => {
   const c = { all: requests.value.length };
@@ -63,6 +98,8 @@ const overdue = (r) => r.status === 'approved' && r.due_date && r.due_date.slice
       </button>
     </div>
     <p v-if="actionError" class="error-text">{{ actionError }}</p>
+    <p v-if="cancelSuccess" class="success-text">{{ cancelSuccess }}</p>
+    <p v-if="returnSuccess" class="success-text">{{ returnSuccess }}</p>
 
     <p v-if="loading" class="empty-state">กำลังโหลด...</p>
     <div v-else-if="shown.length === 0" class="card empty-state">
@@ -88,6 +125,9 @@ const overdue = (r) => r.status === 'approved' && r.due_date && r.due_date.slice
       <button v-if="r.status === 'reserved' && r.pickup_date?.slice(0, 10) <= today()" class="btn" :disabled="submitting === r.borrow_id" @click="pickup(r)">
         {{ submitting === r.borrow_id ? 'กำลังส่ง...' : 'มารับแล้ว — ส่งคำขอยืม' }}
       </button>
+      <button v-if="r.status === 'pending'" class="btn cancel-request" :disabled="submitting === r.borrow_id" @click="cancelTarget = r">
+        {{ submitting === r.borrow_id ? 'กำลังยกเลิก...' : 'ยกเลิกคำขอ' }}
+      </button>
 
       <p v-if="r.purpose" class="purpose"><span>วัตถุประสงค์:</span> {{ r.purpose }}</p>
 
@@ -95,10 +135,26 @@ const overdue = (r) => r.status === 'approved' && r.due_date && r.due_date.slice
         <li v-for="it in r.items" :key="it.detail_id">
           <span class="nm">{{ it.asset_name }} <small>{{ it.asset_code }}</small></span>
           <span v-if="it.return_id" class="ret done">✓ คืนแล้ว {{ fmt(it.return_date) }}</span>
+          <span v-else-if="r.status === 'approved' && it.return_requested_at" class="ret return-requested">แจ้งคืนแล้ว · รอแอดมินตรวจรับ</span>
+          <button v-else-if="r.status === 'approved'" class="btn return-btn" :disabled="returnSubmitting === it.detail_id" @click="requestReturn(it)">
+            {{ returnSubmitting === it.detail_id ? 'กำลังส่ง...' : 'แจ้งคืนอุปกรณ์' }}
+          </button>
           <span v-else-if="r.status === 'approved'" class="ret wait">ยังไม่คืน</span>
         </li>
       </ul>
     </article>
+
+    <div v-if="cancelTarget" class="modal-backdrop" @click.self="cancelTarget = null">
+      <section class="cancel-dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-request-title">
+        <div class="dialog-icon">!</div>
+        <h3 id="cancel-request-title">ยืนยันยกเลิกคำขอ</h3>
+        <p>ต้องการยกเลิกคำขอ <b>{{ cancelTarget.borrow_code }}</b> ใช่หรือไม่</p>
+        <div class="dialog-actions">
+          <button class="btn secondary" :disabled="submitting === cancelTarget.borrow_id" @click="cancelTarget = null">กลับ</button>
+          <button class="btn danger" :disabled="submitting === cancelTarget.borrow_id" @click="cancelRequest">ยืนยันยกเลิก</button>
+        </div>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -109,6 +165,15 @@ const overdue = (r) => r.status === 'approved' && r.due_date && r.due_date.slice
 .req.approved { border-left-color: var(--primary); }
 .req.returned { border-left-color: var(--ok); }
 .req.rejected { border-left-color: var(--danger); }
+.req.cancelled { border-left-color: #9aa4b2; }
+.cancel-request { margin-top: 10px; background: #c0392b; border: 1px solid #a93226; color: #fff; font-weight: 700; }
+.cancel-request:hover:not(:disabled) { background: #a93226; border-color: #922b21; }
+.cancel-request:focus-visible { outline: 3px solid #f4a6a0; outline-offset: 2px; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px; background: rgba(15, 23, 42, .56); backdrop-filter: blur(3px); }
+.cancel-dialog { width: min(440px, calc(100vw - 36px)); background: #fff; padding: 24px; border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0,0,0,.24); }
+.cancel-dialog h3 { margin: 0 0 10px; }
+.cancel-dialog p { color: var(--muted); line-height: 1.6; }
+.dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .code { font-size: 16px; }
 .late { margin-left: 10px; background: var(--danger-soft); color: var(--danger-text); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
@@ -124,6 +189,8 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .items li:last-child { border-bottom: none; padding-bottom: 0; }
 .nm small { color: var(--muted); margin-left: 6px; }
 .ret { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.ret.return-requested { color: #8a5a00; background: #fff4d6; padding: 5px 9px; border-radius: 8px; }
+.return-btn { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
 .ret.done { color: var(--ok-text); }
 .ret.wait { color: var(--warn-text); }
 </style>
