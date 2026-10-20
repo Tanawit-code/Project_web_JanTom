@@ -10,6 +10,7 @@ const { buildPromptPayPayload } = require('../utils/promptpay');
 const slipVerify = require('../utils/slipVerify');
 const { notify, notifyAdmins } = require('../utils/notify');
 const { sendNotifyEmail } = require('../utils/mailer');
+const { recordActivity } = require('../utils/activityLog');
 const { FINE_TYPES, STATUSES, TYPE_LABEL, fmtMoney, frontendUrl, createFine, emailFineCreated } = require('../utils/fines');
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -267,6 +268,8 @@ router.post('/', requireAuth, requireRole('admin'), h(async (req, res) => {
     if (!d) return res.status(400).json({ message: 'รายการยืมไม่ตรงกับพนักงานที่เลือก' });
   }
   const fine = await createFine(pool, { emp_id, detail_id, fine_type, amount, reason, created_by: req.user.emp_id });
+  await recordActivity(req, { action: 'create', entityType: 'fine', entityId: fine.fine_id,
+    summary: `สร้างค่าปรับ ${fine.fine_code} จำนวน ${amount} บาท`, after: { emp_id, detail_id, fine_type, amount, reason, status: 'unpaid' } });
   emailFineCreated(emp_id, { fine_code: fine.fine_code, fine_type, amount, reason });
   res.status(201).json({ ...fine, message: 'สร้างค่าปรับและแจ้งเตือนพนักงานแล้ว' });
 }));
@@ -298,6 +301,11 @@ router.patch('/:id/review', requireAuth, requireRole('admin'), h(async (req, res
   }
   if (upd.affectedRows === 0) return res.status(409).json({ message: 'รายการถูกดำเนินการไปแล้ว' });
 
+  await recordActivity(req, { action: action === 'approve' ? 'approve' : 'reject', entityType: 'fine', entityId: id,
+    summary: `${action === 'approve' ? 'ยืนยันชำระ' : 'ปฏิเสธสลิป'} ${fine.fine_code}`,
+    before: { status: fine.status, amount: Number(fine.amount), fine_type: fine.fine_type, emp_id: fine.emp_id },
+    after: { status: action === 'approve' ? 'paid' : 'unpaid', review_note: action === 'reject' ? note : null } });
+
   const approved = action === 'approve';
   await notify(pool, fine.emp_id, approved
     ? { type: 'fine_paid', title: 'ยืนยันการชำระค่าปรับแล้ว', message: `ค่าปรับ ${fine.fine_code} จำนวน ${fmtMoney(fine.amount)} บาท ชำระเรียบร้อย ขอบคุณครับ`, link: '/my-fines' }
@@ -328,6 +336,8 @@ router.patch('/:id/cancel', requireAuth, requireRole('admin'), h(async (req, res
     `UPDATE FINE SET status = 'cancelled', reviewed_by = ?, slip_file = NULL, slip_hash = NULL
      WHERE fine_id = ? AND status IN ('unpaid', 'slip_submitted')`, [req.user.emp_id, id]);
   if (upd.affectedRows === 0) return res.status(409).json({ message: 'ยกเลิกไม่ได้ รายการนี้ชำระแล้วหรือถูกยกเลิกไปแล้ว' });
+  await recordActivity(req, { action: 'cancel', entityType: 'fine', entityId: id, summary: `ยกเลิกค่าปรับ ${fine.fine_code}`,
+    before: { status: fine.status, amount: Number(fine.amount), fine_type: fine.fine_type, emp_id: fine.emp_id }, after: { status: 'cancelled' } });
   removeSlip(fine.slip_file);
   await notify(pool, fine.emp_id, {
     type: 'fine_cancelled', title: 'ยกเลิกค่าปรับ',

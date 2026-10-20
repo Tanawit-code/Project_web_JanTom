@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validatePasswordStrength } = require('../utils/password');
+const { recordActivity } = require('../utils/activityLog');
 
 // Admin/approver need this list for dropdowns (approver selection), so allow both to read
 router.get('/', requireAuth, requireRole('admin', 'approver'), async (req, res) => {
@@ -31,6 +32,8 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
       [emp_code, first_name, last_name, position || null, phone || null, email || null,
        username, hash, role || 'employee', dept_id || null]
     );
+    await recordActivity(req, { action: 'create', entityType: 'employee', entityId: result.insertId,
+      summary: `เพิ่มบัญชีพนักงาน ${username}`, after: { emp_code, first_name, last_name, position, phone, email, username, role: role || 'employee', dept_id: dept_id || null } });
     res.status(201).json({ emp_id: result.insertId, message: 'เพิ่มพนักงานสำเร็จ' });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'รหัสพนักงาน อีเมล หรือ username ซ้ำกับที่มีอยู่' });
@@ -42,11 +45,16 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
 router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const { first_name, last_name, position, phone, email, role, dept_id } = req.body;
+    const [[before]] = await pool.query('SELECT emp_code, first_name, last_name, position, phone, email, username, role, status, dept_id FROM EMPLOYEE WHERE emp_id=?', [req.params.id]);
+    if (!before) return res.status(404).json({ message: 'ไม่พบพนักงาน' });
     const [result] = await pool.query(
       `UPDATE EMPLOYEE SET first_name=?, last_name=?, position=?, phone=?, email=?, role=?, dept_id=? WHERE emp_id=?`,
       [first_name, last_name, position, phone, email, role, dept_id, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ message: 'ไม่พบพนักงาน' });
+    await recordActivity(req, { action: 'update', entityType: 'employee', entityId: req.params.id,
+      summary: `แก้ไขข้อมูลพนักงาน ${before.first_name} ${before.last_name}`, before,
+      after: { ...before, first_name, last_name, position, phone, email, role, dept_id } });
     res.json({ message: 'แก้ไขข้อมูลพนักงานสำเร็จ' });
   } catch (err) {
     console.error(err);
@@ -56,8 +64,12 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const [[before]] = await pool.query('SELECT emp_code, first_name, last_name, position, phone, email, username, role, status, dept_id FROM EMPLOYEE WHERE emp_id=?', [req.params.id]);
+    if (!before) return res.status(404).json({ message: 'ไม่พบพนักงาน' });
     const [result] = await pool.query('DELETE FROM EMPLOYEE WHERE emp_id = ?', [req.params.id]);
     if (result.affectedRows === 0) return res.status(404).json({ message: 'ไม่พบพนักงาน' });
+    await recordActivity(req, { action: 'delete', entityType: 'employee', entityId: req.params.id,
+      summary: `ลบบัญชีพนักงาน ${before.first_name} ${before.last_name} (${before.emp_code})`, before });
     res.json({ message: 'ลบพนักงานสำเร็จ' });
   } catch (err) {
     res.status(500).json({ message: 'ไม่สามารถลบได้ อาจมีข้อมูลการยืมผูกอยู่' });

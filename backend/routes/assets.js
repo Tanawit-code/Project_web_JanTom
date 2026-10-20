@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { saveImage } = require('../utils/imageStorage');
 const { bangkokToday, isValidCeDate } = require('../utils/dates');
+const { recordActivity } = require('../utils/activityLog');
 
 const BAD_PURCHASE_DATE = 'วันที่ซื้อไม่ถูกต้อง (ต้องเป็นปี ค.ศ. และไม่เกินวันนี้ เช่น 2025-06-10)';
 const badPurchaseDate = (d) => d && (!isValidCeDate(d) || d.slice(0, 10) > bangkokToday());
@@ -84,6 +85,8 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
       [asset_code, asset_name, brand || null, model || null, serial_number || null,
        purchase_date || null, price || null, location || null, cat_id || null, image_url || null]
     );
+    await recordActivity(req, { action: 'create', entityType: 'asset', entityId: result.insertId,
+      summary: `เพิ่มทรัพย์สิน ${asset_name} (${asset_code})`, after: { asset_code, asset_name, brand, model, serial_number, purchase_date, price, location, cat_id, image_url, status: 'available' } });
     res.status(201).json({ asset_id: result.insertId, message: 'เพิ่มทรัพย์สินสำเร็จ' });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'รหัสทรัพย์สินนี้มีอยู่แล้ว' });
@@ -95,19 +98,28 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
 router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const { asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url } = req.body;
   if (badPurchaseDate(purchase_date)) return res.status(400).json({ message: BAD_PURCHASE_DATE });
+  const [[before]] = await pool.query('SELECT asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url FROM ASSET WHERE asset_id=?', [req.params.id]);
+  if (!before) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
   const [result] = await pool.query(
     `UPDATE ASSET SET asset_name=?, brand=?, model=?, serial_number=?, purchase_date=?, price=?, status=?, location=?, cat_id=?, image_url=?
      WHERE asset_id=?`,
     [asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url || null, req.params.id]
   );
   if (result.affectedRows === 0) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
+  await recordActivity(req, { action: 'update', entityType: 'asset', entityId: req.params.id,
+    summary: `แก้ไขทรัพย์สิน ${before.asset_name} (${before.asset_code})`, before,
+    after: { asset_code: before.asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id, image_url: image_url || null } });
   res.json({ message: 'แก้ไขทรัพย์สินสำเร็จ' });
 });
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const [[before]] = await pool.query('SELECT asset_code, asset_name, brand, model, serial_number, purchase_date, price, status, location, cat_id FROM ASSET WHERE asset_id=?', [req.params.id]);
+    if (!before) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
     const [result] = await pool.query('DELETE FROM ASSET WHERE asset_id = ?', [req.params.id]);
     if (result.affectedRows === 0) return res.status(404).json({ message: 'ไม่พบทรัพย์สิน' });
+    await recordActivity(req, { action: 'delete', entityType: 'asset', entityId: req.params.id,
+      summary: `ลบทรัพย์สิน ${before.asset_name} (${before.asset_code})`, before });
     res.json({ message: 'ลบทรัพย์สินสำเร็จ' });
   } catch (err) {
     res.status(400).json({ message: 'ไม่สามารถลบได้ อาจมีประวัติการยืมผูกอยู่' });

@@ -15,6 +15,7 @@ const notificationRoutes = require('./routes/notifications');
 const dashboardRoutes = require('./routes/dashboard');
 const repairRoutes = require('./routes/repairs');
 const reportsRoutes = require('./routes/reports');
+const activityLogRoutes = require('./routes/activityLogs');
 const { startDueReminderJob } = require('./utils/dueReminder');
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/repairs', repairRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
 
 const PORT = process.env.PORT || 4100;
 app.listen(PORT, () => console.log(`Asset system API running on http://localhost:${PORT}`));

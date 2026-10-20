@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 19, 2026 at 08:10 PM
+-- Generation Time: Oct 20, 2026 at 08:41 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -20,6 +20,37 @@ SET time_zone = "+00:00";
 --
 -- Database: `assetdb`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `activity_log`
+--
+
+CREATE TABLE `activity_log` (
+  `log_id` bigint(20) UNSIGNED NOT NULL,
+  `actor_emp_id` int(11) DEFAULT NULL,
+  `actor_name` varchar(100) NOT NULL,
+  `action` varchar(40) NOT NULL,
+  `entity_type` varchar(50) NOT NULL,
+  `entity_id` varchar(64) DEFAULT NULL,
+  `summary` varchar(255) NOT NULL,
+  `before_data` longtext DEFAULT NULL,
+  `after_data` longtext DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `activity_log`
+--
+
+INSERT INTO `activity_log` (`log_id`, `actor_emp_id`, `actor_name`, `action`, `entity_type`, `entity_id`, `summary`, `before_data`, `after_data`, `ip_address`, `created_at`) VALUES
+(1, 1, 'admin', 'update', 'asset', '54', 'แก้ไขทรัพย์สิน ป้ายไวนิลขาตั้ง X-Stand (AST-0053)', '{\"asset_code\":\"AST-0053\",\"asset_name\":\"ป้ายไวนิลขาตั้ง X-Stand\",\"brand\":\"Generic\",\"model\":\"X-Stand 60x160\",\"serial_number\":\"SN-XST-01\",\"purchase_date\":\"2024-02-27\",\"price\":\"600.00\",\"status\":\"available\",\"location\":\"คลังพัสดุ\",\"cat_id\":12,\"image_url\":\"https://res.cloudinary.com/uh1wpe42/image/upload/v1792322088/assets/izxd7zjkljgr22rsgjvc.jpg\"}', '{\"asset_code\":\"AST-0053\",\"asset_name\":\"ป้ายไวนิลขาตั้ง X-Stand\",\"brand\":\"Generic\",\"model\":\"X-Stand 60x160\",\"serial_number\":\"SN-XST-01\",\"purchase_date\":\"2024-02-27\",\"price\":500,\"status\":\"available\",\"location\":\"คลังพัสดุ\",\"cat_id\":12,\"image_url\":\"https://res.cloudinary.com/uh1wpe42/image/upload/v1792322088/assets/izxd7zjkljgr22rsgjvc.jpg\"}', '::1', '2026-10-20 13:36:33'),
+(2, 1, 'admin', 'delete', 'asset', '51', 'ลบทรัพย์สิน เต็นท์พับ 3x3 เมตร (AST-0050)', '{\"asset_code\":\"AST-0050\",\"asset_name\":\"เต็นท์พับ 3x3 เมตร\",\"brand\":\"Sport Pro\",\"model\":\"Easy-Up 3x3\",\"serial_number\":\"SN-SPP-T33-01\",\"purchase_date\":\"2023-11-03\",\"price\":\"3900.00\",\"status\":\"available\",\"location\":\"คลังพัสดุ\",\"cat_id\":12}', NULL, '::1', '2026-10-20 13:37:57'),
+(3, 5, 'teerapat', 'create', 'borrow_request', '27', 'ส่งคำขอยืม BR-20261020-7366', NULL, '{\"status\":\"pending\",\"due_date\":\"2026-10-23\",\"pickup_date\":null,\"purpose\":null,\"asset_ids\":[10,12,3],\"borrower_emp_id\":5}', '::1', '2026-10-20 13:38:35'),
+(4, 5, 'teerapat', 'create', 'reservation', '28', 'ส่งคำขอจอง BR-20261020-1567', NULL, '{\"status\":\"reserved\",\"due_date\":\"2026-10-29\",\"pickup_date\":\"2026-10-26\",\"purpose\":null,\"asset_ids\":[17],\"borrower_emp_id\":5}', '::1', '2026-10-20 13:38:59'),
+(5, 1, 'admin', 'approve', 'borrow_request', '27', 'อนุมัติคำขอ BR-20261020-7366', '{\"status\":\"pending\",\"borrower_emp_id\":5,\"due_date\":\"2026-10-23\",\"items\":[{\"asset_id\":10,\"asset_name\":\"โน้ตบุ๊ก ASUS Vivobook\",\"asset_code\":\"AST-0009\",\"status\":\"available\"},{\"asset_id\":12,\"asset_name\":\"คอมพิวเตอร์ตั้งโต๊ะ Dell OptiPlex\",\"asset_code\":\"AST-0011\",\"status\":\"available\"},{\"asset_id\":3,\"asset_name\":\"กล้องถ่ายภาพ Canon\",\"asset_code\":\"AST-0003\",\"status\":\"available\"}]}', '{\"status\":\"approved\",\"note\":null,\"items\":[{\"asset_id\":10,\"asset_name\":\"โน้ตบุ๊ก ASUS Vivobook\",\"asset_code\":\"AST-0009\",\"status\":\"borrowed\"},{\"asset_id\":12,\"asset_name\":\"คอมพิวเตอร์ตั้งโต๊ะ Dell OptiPlex\",\"asset_code\":\"AST-0011\",\"status\":\"borrowed\"},{\"asset_id\":3,\"asset_name\":\"กล้องถ่ายภาพ Canon\",\"asset_code\":\"AST-0003\",\"status\":\"borrowed\"}]}', '::1', '2026-10-20 13:39:21');
 
 -- --------------------------------------------------------
 
@@ -49,20 +80,20 @@ CREATE TABLE `asset` (
 INSERT INTO `asset` (`asset_id`, `asset_code`, `asset_name`, `brand`, `model`, `serial_number`, `purchase_date`, `price`, `status`, `location`, `image_url`, `cat_id`) VALUES
 (1, 'AST-0001', 'โน้ตบุ๊ก Dell Latitude', 'Dell', 'Latitude 5420', 'SN-D5420-01', '2024-02-29', 28000.00, 'available', 'คลังไอที', '/uploads/1791258914162-979094976.jpg', 1),
 (2, 'AST-0002', 'โปรเจกเตอร์ Epson', 'Epson', 'EB-X06', 'SN-EPX06-01', '2023-11-13', 15000.00, 'available', 'ห้องประชุม A', '/uploads/1791258881414-56004592.jpg', 2),
-(3, 'AST-0003', 'กล้องถ่ายภาพ Canon', 'Canon', 'EOS 200D', 'SN-EOS-01', '2024-01-18', 22000.00, 'available', 'คลังไอที', '/uploads/1791259121562-646489660.webp', 1),
+(3, 'AST-0003', 'กล้องถ่ายภาพ Canon', 'Canon', 'EOS 200D', 'SN-EOS-01', '2024-01-18', 22000.00, 'borrowed', 'คลังไอที', '/uploads/1791259121562-646489660.webp', 1),
 (4, 'AST-0004', 'สว่านไฟฟ้า Bosch', 'Bosch', 'GSB 13RE', 'SN-BOSCH-01', '2022-06-09', 3500.00, 'available', 'ห้องช่าง', '/uploads/1791258701640-381870041.jpg', 3),
 (5, 'AST-0005', 'ไมค์ BOYA', 'BOYA', 'V2.0', 'SN-005', '2026-06-10', 2000.00, 'available', 'ครังไอที', '/uploads/1791260410747-539846236.jpg', 2),
 (7, 'AST-0006', 'โน้ตบุ๊ก Lenovo ThinkPad 2', 'Lenovo', 'ThinkPad E14 Gen 5', 'SN-LNV-E14-01', '2024-05-20', 26900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323372/assets/aqyj21tiapcbunf9zdrl.jpg', 1),
 (8, 'AST-0007', 'โน้ตบุ๊ก Lenovo ThinkPad', 'Lenovo', 'ThinkPad E14 Gen 5', 'SN-LNV-E14-02', '2024-05-20', 26900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323326/assets/pex4geeik2afu0qxlmd6.jpg', 1),
 (9, 'AST-0008', 'โน้ตบุ๊ก HP ProBook', 'HP', 'ProBook 440 G10', 'SN-HP-440-01', '2024-08-12', 24500.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323337/assets/xx1lalsodqvehudoezjp.jpg', 1),
-(10, 'AST-0009', 'โน้ตบุ๊ก ASUS Vivobook', 'ASUS', 'Vivobook 15 X1504', 'SN-ASUS-V15-01', '2025-02-10', 18900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323276/assets/xybxs4rthmolagxzoq6c.jpg', 1),
+(10, 'AST-0009', 'โน้ตบุ๊ก ASUS Vivobook', 'ASUS', 'Vivobook 15 X1504', 'SN-ASUS-V15-01', '2025-02-10', 18900.00, 'borrowed', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323276/assets/xybxs4rthmolagxzoq6c.jpg', 1),
 (11, 'AST-0010', 'MacBook Air 13 นิ้ว', 'Apple', 'MacBook Air M2', 'SN-APL-MBA-01', '2024-03-15', 37900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323248/assets/avfghp1mykodxfmpfbtd.jpg', 1),
 (12, 'AST-0011', 'คอมพิวเตอร์ตั้งโต๊ะ Dell OptiPlex', 'Dell', 'OptiPlex 3000', 'SN-DELL-OP3K-01', '2023-09-05', 19500.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323229/assets/ksizi8jzxqrnzdahmznk.jpg', 1),
 (13, 'AST-0012', 'โปรเจกเตอร์ BenQ', 'BenQ', 'MH560', 'SN-BNQ-MH560-01', '2024-04-02', 17900.00, 'available', 'ห้องประชุม B', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323205/assets/yncgu3h3sodnlwwdgnn6.png', 2),
 (14, 'AST-0013', 'จอโปรเจกเตอร์ ขาตั้ง 100 นิ้ว', 'Telon', 'Tripod 100\"', 'SN-TLN-100-01', '2023-07-18', 3200.00, 'available', 'ห้องประชุม A', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323176/assets/ugc4mmqop7pe91gnfzj1.jpg', 2),
 (15, 'AST-0014', 'ลำโพงประชุมไร้สาย', 'Jabra', 'Speak 510', 'SN-JBR-S510-01', '2024-01-22', 5900.00, 'available', 'ห้องประชุม A', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323156/assets/q6nftvms8nhdlllysvzf.jpg', 2),
 (16, 'AST-0015', 'ตัวควบคุมสไลด์ (Presenter)', 'Logitech', 'R400', 'SN-LGT-R400-01', '2023-10-09', 1200.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323136/assets/oqiocppdathoux9fjyvy.jpg', 2),
-(17, 'AST-0016', 'จอทีวีสำหรับประชุม 55 นิ้ว', 'Samsung', 'UA55CU7700', 'SN-SSG-55-01', '2024-06-30', 14900.00, 'available', 'ห้องประชุม B', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323121/assets/ntkip6soiu7zelexhoam.jpg', 2),
+(17, 'AST-0016', 'จอทีวีสำหรับประชุม 55 นิ้ว', 'Samsung', 'UA55CU7700', 'SN-SSG-55-01', '2024-06-30', 14900.00, 'reserved', 'ห้องประชุม B', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323121/assets/ntkip6soiu7zelexhoam.jpg', 2),
 (18, 'AST-0017', 'เครื่องพิมพ์เลเซอร์ HP', 'HP', 'LaserJet Pro M404dn', 'SN-HP-M404-01', '2023-05-14', 9900.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323098/assets/vcqtepshzesawqhwktlf.jpg', 4),
 (19, 'AST-0018', 'เครื่องพิมพ์ Brother อเนกประสงค์', 'Brother', 'MFC-L2750DW', 'SN-BRO-L2750-01', '2024-02-08', 8500.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323077/assets/qgrvmnm1qa9yuoq3oz81.jpg', 4),
 (20, 'AST-0019', 'สแกนเนอร์เอกสาร', 'Epson', 'WorkForce DS-530II', 'SN-EPS-DS530-01', '2023-12-01', 13900.00, 'available', 'ห้องสำนักงาน', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323056/assets/okbiw306yvkg00ynrets.jpg', 4),
@@ -78,7 +109,7 @@ INSERT INTO `asset` (`asset_id`, `asset_code`, `asset_name`, `brand`, `model`, `
 (31, 'AST-0030', 'ไฟสตูดิโอ LED', 'Godox', 'SL60W', 'SN-GDX-SL60-01', '2023-11-25', 4500.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322825/assets/zgbkjpd7yo5ca3kepler.jpg', 6),
 (32, 'AST-0031', 'iPad สำหรับใช้งานนอกสถานที่', 'Apple', 'iPad 10th Gen', 'SN-APL-IPD-01', '2024-01-12', 12900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322802/assets/hjf4cg2hirrrftltfrdj.jpg', 7),
 (35, 'AST-0034', 'จอภาพ 24 นิ้ว', 'Dell', 'P2422H', 'SN-DELL-P2422-01', '2023-09-05', 5900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322758/assets/jdvtybicqfxg0waa7sgi.jpg', 8),
-(36, 'AST-0035', 'จอภาพ 27 นิ้ว', 'LG', '27UL500', 'SN-LG-27UL-01', '2024-02-14', 8900.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322732/assets/uhsiunmghxdkoqss1hzt.jpg', 8),
+(36, 'AST-0035', 'จอภาพ 27 นิ้ว', 'LG', '27UL500', 'SN-LG-27UL-01', '2024-02-14', 8900.00, 'repair', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322732/assets/uhsiunmghxdkoqss1hzt.jpg', 8),
 (38, 'AST-0037', 'คีย์บอร์ดและเมาส์ไร้สาย', 'Logitech', 'MK270', 'SN-LGT-MK270-01', '2024-01-08', 650.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322689/assets/bd3fbnynrgtb8bjk5voc.jpg', 8),
 (39, 'AST-0038', 'เว็บแคม Full HD', 'Logitech', 'C920', 'SN-LGT-C920-01', '2023-10-17', 2400.00, 'available', 'คลังไอที', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322657/assets/rtpjlelj4mmlb3iqsng7.png', 8),
 (40, 'AST-0039', 'ชุดไขควงอเนกประสงค์', 'Wiha', 'Precision 31 pcs', 'SN-WHA-31-01', '2023-04-12', 1800.00, 'available', 'ห้องช่าง', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322670/assets/vgbwuipjdxvpoomcy7mf.jpg', 3),
@@ -91,10 +122,9 @@ INSERT INTO `asset` (`asset_id`, `asset_code`, `asset_name`, `brand`, `model`, `
 (48, 'AST-0047', 'รถจักรยานยนต์ส่งเอกสาร', 'Honda', 'Wave 125i', 'SN-HND-W125-01', '2023-04-04', 45000.00, 'available', 'ลานจอดรถ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322377/assets/kdwj80yeqq3tfoifmeml.jpg', 10),
 (49, 'AST-0048', 'ชุดปฐมพยาบาลพกพา', 'Safety Plus', 'FA-Box M', 'SN-SFP-FA-01', '2024-01-05', 1500.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322245/assets/cymiqsvci3ajgih5ysdd.jpg', 11),
 (50, 'AST-0049', 'หมวกนิรภัย (ชุด 5 ใบ)', '3M', 'H-700', 'SN-3M-H700-01', '2023-08-08', 2500.00, 'repair', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322239/assets/tbbvtqekeldtscs6xhnc.jpg', 11),
-(51, 'AST-0050', 'เต็นท์พับ 3x3 เมตร', 'Sport Pro', 'Easy-Up 3x3', 'SN-SPP-T33-01', '2023-11-03', 3900.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322230/assets/syly4czb3naov6wzxvva.jpg', 12),
 (52, 'AST-0051', 'โต๊ะพับอเนกประสงค์ 180 ซม.', 'Index', 'FT-180', 'SN-IDX-FT180-01', '2023-05-22', 1900.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792323414/assets/jgbagtkamsrlk5dr3fma.jpg', 12),
 (53, 'AST-0052', 'เก้าอี้พับ (ชุด 10 ตัว)', 'Index', 'FC-10', 'SN-IDX-FC10-01', '2023-05-22', 4500.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322114/assets/raxwo4erndlbt58wgqxu.jpg', 12),
-(54, 'AST-0053', 'ป้ายไวนิลขาตั้ง X-Stand', 'Generic', 'X-Stand 60x160', 'SN-XST-01', '2024-02-27', 600.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322088/assets/izxd7zjkljgr22rsgjvc.jpg', 12);
+(54, 'AST-0053', 'ป้ายไวนิลขาตั้ง X-Stand', 'Generic', 'X-Stand 60x160', 'SN-XST-01', '2024-02-27', 500.00, 'available', 'คลังพัสดุ', 'https://res.cloudinary.com/uh1wpe42/image/upload/v1792322088/assets/izxd7zjkljgr22rsgjvc.jpg', 12);
 
 -- --------------------------------------------------------
 
@@ -189,7 +219,11 @@ INSERT INTO `borrow_detail` (`detail_id`, `condition_out`, `detail_note`, `borro
 (42, NULL, NULL, 25, 10),
 (43, NULL, NULL, 25, 12),
 (44, NULL, NULL, 26, 10),
-(45, NULL, NULL, 26, 12);
+(45, NULL, NULL, 26, 12),
+(46, NULL, NULL, 27, 10),
+(47, NULL, NULL, 27, 12),
+(48, NULL, NULL, 27, 3),
+(49, NULL, NULL, 28, 17);
 
 -- --------------------------------------------------------
 
@@ -254,7 +288,9 @@ INSERT INTO `borrow_request` (`borrow_id`, `borrow_code`, `request_date`, `due_d
 (23, 'BR-20261020-3916', '2026-10-20 00:56:57', '2026-10-23', NULL, NULL, 'rejected', '2026-10-20 00:57:12', NULL, 1, 1),
 (24, 'BR-20261020-6750', '2026-10-20 00:57:18', '2026-10-21', NULL, NULL, 'rejected', '2026-10-20 00:59:31', NULL, 16, 1),
 (25, 'BR-20261020-4127', '2026-10-20 00:58:13', '2026-10-23', NULL, NULL, 'rejected', '2026-10-20 00:59:32', NULL, 5, 1),
-(26, 'BR-20261020-6229', '2026-10-20 00:59:24', '2026-10-23', NULL, NULL, 'rejected', '2026-10-20 00:59:33', NULL, 5, 1);
+(26, 'BR-20261020-6229', '2026-10-20 00:59:24', '2026-10-23', NULL, NULL, 'rejected', '2026-10-20 00:59:33', NULL, 5, 1),
+(27, 'BR-20261020-7366', '2026-10-20 13:38:35', '2026-10-23', NULL, NULL, 'approved', '2026-10-20 13:39:21', NULL, 5, 1),
+(28, 'BR-20261020-1567', '2026-10-20 13:38:59', '2026-10-29', '2026-10-26', NULL, 'reserved', NULL, NULL, 5, NULL);
 
 -- --------------------------------------------------------
 
@@ -370,7 +406,8 @@ INSERT INTO `fine` (`fine_id`, `fine_code`, `emp_id`, `detail_id`, `fine_type`, 
 (12, 'FN-20261018-9014', 5, NULL, 'damaged', 100.00, 'test3', 'paid', 'slip-12-1792328864694-825559051.webp', 'd536fa9fd4f9a113a8cfc958c88c79a98782992175a3c329b08d11387bedac29', 'MOCK5F20061E6D82C5D6685F', '2026-10-18 20:07:44', NULL, 'verified', 'ตรวจอัตโนมัติผ่าน: ยอด 100.00 บาท ตรงกัน อ้างอิง MOCK5F20061E6D82C5D6685F', 1, '2026-10-18 20:07:44', NULL, 1, '2026-10-18 20:07:39'),
 (13, 'FN-20261018-5928', 5, NULL, 'damaged', 100.00, 'test4', 'paid', 'slip-13-1792329386228-422904160.webp', 'c12ac52583893c78b74344dc2813496591803b71c0f4ebe5308af6db73becabc', 'MOCK94A0ECBA783DB7A36BCD', '2026-10-18 20:16:26', NULL, 'verified', 'ตรวจอัตโนมัติผ่าน: ยอด 100.00 บาท ตรงกัน อ้างอิง MOCK94A0ECBA783DB7A36BCD', 1, '2026-10-18 20:16:26', NULL, 1, '2026-10-18 20:09:23'),
 (14, 'FN-20261018-9128', 5, 16, 'late', 100.00, 'ส่งคืนล่าช้า 1 วัน (วันละ 100 บาท)', 'paid', 'slip-14-1792329469826-376245211.jpg', 'd6316f566d4bd43b1abd7ba1dca02988f06104404489446c283990da81bf3596', 'MOCK0939134556604DB7A7F7', '2026-10-18 20:17:49', NULL, 'verified', 'ตรวจอัตโนมัติผ่าน: ยอด 100.00 บาท ตรงกัน อ้างอิง MOCK0939134556604DB7A7F7', 1, '2026-10-18 20:17:49', NULL, 1, '2026-10-18 20:17:39'),
-(15, 'FN-20261020-1251', 16, 22, 'damaged', 100.00, 'ทรัพย์สินชำรุด/เสียหาย', 'paid', 'slip-15-1792432943433-314252030.jpg', 'ebd81bf7ccf5067daca7b0a65e84027021bff67e52a55ec18cb8a7bd851e3d8a', 'MOCKFB98DC674D15C79FEFF9', '2026-10-20 01:02:23', NULL, 'verified', 'ตรวจอัตโนมัติผ่าน: ยอด 100.00 บาท ตรงกัน อ้างอิง MOCKFB98DC674D15C79FEFF9', 1, '2026-10-20 01:02:23', NULL, 1, '2026-10-20 01:02:06');
+(15, 'FN-20261020-1251', 16, 22, 'damaged', 100.00, 'ทรัพย์สินชำรุด/เสียหาย', 'paid', 'slip-15-1792432943433-314252030.jpg', 'ebd81bf7ccf5067daca7b0a65e84027021bff67e52a55ec18cb8a7bd851e3d8a', 'MOCKFB98DC674D15C79FEFF9', '2026-10-20 01:02:23', NULL, 'verified', 'ตรวจอัตโนมัติผ่าน: ยอด 100.00 บาท ตรงกัน อ้างอิง MOCKFB98DC674D15C79FEFF9', 1, '2026-10-20 01:02:23', NULL, 1, '2026-10-20 01:02:06'),
+(16, 'FN-20261020-4503', 5, 47, 'damaged', 100.00, 'ทรัพย์สินชำรุด/เสียหาย', 'unpaid', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, 1, '2026-10-20 13:40:42');
 
 -- --------------------------------------------------------
 
@@ -433,13 +470,13 @@ INSERT INTO `notification` (`notif_id`, `emp_id`, `type`, `title`, `message`, `l
 (37, 5, 'fine_rejected', 'สลิปไม่ผ่านการตรวจสอบ', 'ค่าปรับ FN-20261018-4854: a — กรุณาแนบสลิปใหม่', '/my-fines', 1, '2026-10-18 20:01:08'),
 (38, 1, 'slip_submitted', 'มีสลิปค่าปรับรอตรวจสอบ', 'Teerapat poom ส่งสลิปค่าปรับ FN-20261018-4854 จำนวน 200.00 บาท', '/admin/fines', 1, '2026-10-18 20:02:52'),
 (39, 5, 'fine_cancelled', 'ยกเลิกค่าปรับ', 'ค่าปรับ FN-20261018-4854 จำนวน 200.00 บาท ถูกยกเลิกแล้ว ไม่ต้องชำระ', '/my-fines', 1, '2026-10-18 20:03:01'),
-(40, 5, 'fine_created', 'ตรวจพบ: ทรัพย์สินชำรุด/เสียหาย', 'test3 — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 0, '2026-10-18 20:07:39'),
-(41, 5, 'fine_paid', 'ชำระค่าปรับเรียบร้อย (ตรวจสอบอัตโนมัติ)', 'ค่าปรับ FN-20261018-9014 จำนวน 100.00 บาท ชำระเรียบร้อย ขอบคุณครับ', '/my-fines', 0, '2026-10-18 20:07:44'),
+(40, 5, 'fine_created', 'ตรวจพบ: ทรัพย์สินชำรุด/เสียหาย', 'test3 — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 1, '2026-10-18 20:07:39'),
+(41, 5, 'fine_paid', 'ชำระค่าปรับเรียบร้อย (ตรวจสอบอัตโนมัติ)', 'ค่าปรับ FN-20261018-9014 จำนวน 100.00 บาท ชำระเรียบร้อย ขอบคุณครับ', '/my-fines', 1, '2026-10-18 20:07:44'),
 (42, 1, 'fine_paid', 'พนักงานชำระค่าปรับแล้ว (ตรวจสลิปอัตโนมัติ)', 'Teerapat poom ชำระค่าปรับ FN-20261018-9014 จำนวน 100.00 บาท', '/admin/fines', 1, '2026-10-18 20:07:44'),
-(43, 5, 'fine_created', 'ตรวจพบ: ทรัพย์สินชำรุด/เสียหาย', 'test4 — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 0, '2026-10-18 20:09:23'),
-(44, 5, 'fine_paid', 'ชำระค่าปรับเรียบร้อย (ตรวจสอบอัตโนมัติ)', 'ค่าปรับ FN-20261018-5928 จำนวน 100.00 บาท ชำระเรียบร้อย ขอบคุณครับ', '/my-fines', 0, '2026-10-18 20:16:26'),
+(43, 5, 'fine_created', 'ตรวจพบ: ทรัพย์สินชำรุด/เสียหาย', 'test4 — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 1, '2026-10-18 20:09:23'),
+(44, 5, 'fine_paid', 'ชำระค่าปรับเรียบร้อย (ตรวจสอบอัตโนมัติ)', 'ค่าปรับ FN-20261018-5928 จำนวน 100.00 บาท ชำระเรียบร้อย ขอบคุณครับ', '/my-fines', 1, '2026-10-18 20:16:26'),
 (45, 1, 'fine_paid', 'พนักงานชำระค่าปรับแล้ว (ตรวจสลิปอัตโนมัติ)', 'Teerapat poom ชำระค่าปรับ FN-20261018-5928 จำนวน 100.00 บาท', '/admin/fines', 1, '2026-10-18 20:16:26'),
-(46, 5, 'fine_created', 'ตรวจพบ: ส่งคืนล่าช้า', 'ส่งคืนล่าช้า 1 วัน (วันละ 100 บาท) — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 0, '2026-10-18 20:17:39'),
+(46, 5, 'fine_created', 'ตรวจพบ: ส่งคืนล่าช้า', 'ส่งคืนล่าช้า 1 วัน (วันละ 100 บาท) — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 1, '2026-10-18 20:17:39'),
 (47, 5, 'fine_paid', 'ชำระค่าปรับเรียบร้อย (ตรวจสอบอัตโนมัติ)', 'ค่าปรับ FN-20261018-9128 จำนวน 100.00 บาท ชำระเรียบร้อย ขอบคุณครับ', '/my-fines', 1, '2026-10-18 20:17:49'),
 (48, 1, 'fine_paid', 'พนักงานชำระค่าปรับแล้ว (ตรวจสลิปอัตโนมัติ)', 'Teerapat poom ชำระค่าปรับ FN-20261018-9128 จำนวน 100.00 บาท', '/admin/fines', 1, '2026-10-18 20:17:49'),
 (49, 1, 'reserve_created', 'มีการจองทรัพย์สินล่วงหน้า', 'tanawit tanawit · จองเมื่อ 20/10/2026 00:47 · นัดรับ 2026-10-22 · ชุดไขควงอเนกประสงค์ (AST-0039)', '/admin/dashboard', 1, '2026-10-20 00:47:38'),
@@ -447,7 +484,10 @@ INSERT INTO `notification` (`notif_id`, `emp_id`, `type`, `title`, `message`, `l
 (51, 1, 'borrow_request_created', 'มีคำขอยืมใหม่รออนุมัติ', 'Teerapat poom · BR-20261020-6229 · ส่งเมื่อ 20/10/2026 00:59 · คืน 2026-10-23 · โน้ตบุ๊ก ASUS Vivobook (AST-0009), คอมพิวเตอร์ตั้งโต๊ะ Dell OptiPlex (AST-0011)', '/approvals', 1, '2026-10-20 00:59:24'),
 (52, 16, 'fine_created', 'ตรวจพบ: ทรัพย์สินชำรุด/เสียหาย', 'ทรัพย์สินชำรุด/เสียหาย — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 1, '2026-10-20 01:02:06'),
 (53, 16, 'fine_paid', 'ชำระค่าปรับเรียบร้อย (ตรวจสอบอัตโนมัติ)', 'ค่าปรับ FN-20261020-1251 จำนวน 100.00 บาท ชำระเรียบร้อย ขอบคุณครับ', '/my-fines', 1, '2026-10-20 01:02:23'),
-(54, 1, 'fine_paid', 'พนักงานชำระค่าปรับแล้ว (ตรวจสลิปอัตโนมัติ)', 'tanawit tanawit ชำระค่าปรับ FN-20261020-1251 จำนวน 100.00 บาท', '/admin/fines', 0, '2026-10-20 01:02:23');
+(54, 1, 'fine_paid', 'พนักงานชำระค่าปรับแล้ว (ตรวจสลิปอัตโนมัติ)', 'tanawit tanawit ชำระค่าปรับ FN-20261020-1251 จำนวน 100.00 บาท', '/admin/fines', 1, '2026-10-20 01:02:23'),
+(55, 1, 'borrow_request_created', 'มีคำขอยืมใหม่รออนุมัติ', 'Teerapat poom · BR-20261020-7366 · ส่งเมื่อ 20/10/2026 13:38 · คืน 2026-10-23 · กล้องถ่ายภาพ Canon (AST-0003), โน้ตบุ๊ก ASUS Vivobook (AST-0009) และอีก 1 รายการ', '/approvals', 1, '2026-10-20 13:38:35'),
+(56, 1, 'reserve_created', 'มีการจองทรัพย์สินล่วงหน้า', 'Teerapat poom · BR-20261020-1567 · จองเมื่อ 20/10/2026 13:38 · นัดรับ 2026-10-26 · จอทีวีสำหรับประชุม 55 นิ้ว (AST-0016)', '/admin/reservations', 0, '2026-10-20 13:38:59'),
+(57, 5, 'fine_created', 'ตรวจพบ: ทรัพย์สินชำรุด/เสียหาย', 'ทรัพย์สินชำรุด/เสียหาย — ค่าปรับ 100.00 บาท กรุณาชำระผ่าน QR แล้วแนบสลิป', '/my-fines', 1, '2026-10-20 13:40:42');
 
 -- --------------------------------------------------------
 
@@ -471,7 +511,8 @@ CREATE TABLE `repair` (
 
 INSERT INTO `repair` (`repair_id`, `report_date`, `problem_detail`, `repair_date`, `cost`, `repair_status`, `asset_id`) VALUES
 (1, '2026-10-19', 'จอแตก', '2026-10-19', 0.00, 'done', 9),
-(2, '2026-10-19', 'แตก', NULL, NULL, 'pending', 50);
+(2, '2026-10-19', 'แตก', NULL, NULL, 'pending', 50),
+(3, '2026-10-20', 'จอแตก', NULL, NULL, 'pending', 36);
 
 -- --------------------------------------------------------
 
@@ -511,11 +552,22 @@ INSERT INTO `return_record` (`return_id`, `return_date`, `condition_in`, `fine_a
 (15, '2026-10-18 17:11:30', 'คืนล่าช้า', 100.00, NULL, 15, 1),
 (16, '2026-10-18 20:17:39', NULL, 100.00, NULL, 16, 1),
 (17, '2026-10-20 01:02:06', NULL, 100.00, NULL, 22, 1),
-(18, '2026-10-20 01:02:13', 'ปกติ', 0.00, NULL, 23, 1);
+(18, '2026-10-20 01:02:13', 'ปกติ', 0.00, NULL, 23, 1),
+(19, '2026-10-20 13:40:42', 'ขาหัก', 100.00, NULL, 47, 1);
 
 --
 -- Indexes for dumped tables
 --
+
+--
+-- Indexes for table `activity_log`
+--
+ALTER TABLE `activity_log`
+  ADD PRIMARY KEY (`log_id`),
+  ADD KEY `idx_activity_created` (`created_at`),
+  ADD KEY `idx_activity_entity` (`entity_type`,`entity_id`),
+  ADD KEY `idx_activity_actor` (`actor_emp_id`),
+  ADD KEY `idx_activity_action` (`action`);
 
 --
 -- Indexes for table `asset`
@@ -610,6 +662,12 @@ ALTER TABLE `return_record`
 --
 
 --
+-- AUTO_INCREMENT for table `activity_log`
+--
+ALTER TABLE `activity_log`
+  MODIFY `log_id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT for table `asset`
 --
 ALTER TABLE `asset`
@@ -625,13 +683,13 @@ ALTER TABLE `asset_category`
 -- AUTO_INCREMENT for table `borrow_detail`
 --
 ALTER TABLE `borrow_detail`
-  MODIFY `detail_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
+  MODIFY `detail_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
 
 --
 -- AUTO_INCREMENT for table `borrow_request`
 --
 ALTER TABLE `borrow_request`
-  MODIFY `borrow_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
+  MODIFY `borrow_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `department`
@@ -649,25 +707,25 @@ ALTER TABLE `employee`
 -- AUTO_INCREMENT for table `fine`
 --
 ALTER TABLE `fine`
-  MODIFY `fine_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `fine_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `notification`
 --
 ALTER TABLE `notification`
-  MODIFY `notif_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
+  MODIFY `notif_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
 
 --
 -- AUTO_INCREMENT for table `repair`
 --
 ALTER TABLE `repair`
-  MODIFY `repair_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `repair_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `return_record`
 --
 ALTER TABLE `return_record`
-  MODIFY `return_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `return_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- Constraints for dumped tables
