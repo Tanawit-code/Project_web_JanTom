@@ -24,6 +24,7 @@ import ConfirmEmailChange from '../views/ConfirmEmailChange.vue';
 import ConfirmPasswordChange from '../views/ConfirmPasswordChange.vue';
 import AdminReports from '../views/admin/AdminReports.vue';
 import AdminReservations from '../views/admin/AdminReservations.vue';
+import AdminActivityLogs from '../views/admin/AdminActivityLogs.vue';
 
 const routes = [
   { path: '/login', component: Login },
@@ -43,6 +44,7 @@ const routes = [
   { path: '/admin/returns', component: AdminReturns, meta: { requiresRole: ['admin', 'approver'] } },
   { path: '/admin/reservations', component: AdminReservations, meta: { requiresRole: ['admin'] } },
   { path: '/admin/dashboard', component: AdminDashboard, meta: { requiresRole: ['admin'] } },
+  { path: '/admin/activity-logs', component: AdminActivityLogs, meta: { requiresRole: ['admin'] } },
   { path: '/admin/fines', component: AdminFines, meta: { requiresRole: ['admin'] } },
   { path: '/admin/repairs', component: AdminRepairs, meta: { requiresRole: ['admin', 'approver'] } },
   { path: '/admin/employees', component: AdminEmployees, meta: { requiresRole: ['admin'] } },

@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { bangkokToday, bangkokDatePlusDays, isValidCeDate } = require('../utils/dates');
 const { notifyAdmins } = require('../utils/notify');
+const { recordActivity } = require('../utils/activityLog');
 
 function genBorrowCode() {
   const d = new Date();
@@ -80,6 +81,13 @@ router.post('/', requireAuth, async (req, res) => {
       );
       if (reserve) await conn.query(`UPDATE ASSET SET status='reserved' WHERE asset_id=?`, [asset_id]);
     }
+
+    await recordActivity(req, {
+      action: 'create', entityType: reserve ? 'reservation' : 'borrow_request', entityId: borrow_id,
+      summary: `${reserve ? 'ส่งคำขอจอง' : 'ส่งคำขอยืม'} ${borrow_code}`,
+      after: { status: reserve ? 'reserved' : 'pending', due_date: finalDue, pickup_date: pickup,
+        purpose: purpose || null, asset_ids: uniqueAssetIds, borrower_emp_id: req.user.emp_id },
+    }, conn);
 
     await conn.commit();
     try {
@@ -218,7 +226,7 @@ router.delete('/:id/reservation', requireAuth, requireRole('admin'), async (req,
   try {
     await conn.beginTransaction();
     const [[reservation]] = await conn.query(
-      `SELECT borrow_id FROM BORROW_REQUEST WHERE borrow_id = ? AND status = 'reserved' FOR UPDATE`,
+      `SELECT borrow_id, borrow_code, emp_id, pickup_date, due_date FROM BORROW_REQUEST WHERE borrow_id = ? AND status = 'reserved' FOR UPDATE`,
       [req.params.id]
     );
     if (!reservation) {
@@ -226,12 +234,18 @@ router.delete('/:id/reservation', requireAuth, requireRole('admin'), async (req,
       return res.status(409).json({ message: 'รายการนี้ไม่อยู่ในสถานะจอง หรือดำเนินการไปแล้ว' });
     }
     const [items] = await conn.query(
-      'SELECT asset_id FROM BORROW_DETAIL WHERE borrow_id = ? FOR UPDATE', [reservation.borrow_id]
+      'SELECT bd.asset_id, a.asset_name, a.asset_code FROM BORROW_DETAIL bd JOIN ASSET a ON a.asset_id=bd.asset_id WHERE bd.borrow_id = ? FOR UPDATE', [reservation.borrow_id]
     );
     await conn.query("UPDATE BORROW_REQUEST SET status = 'cancelled' WHERE borrow_id = ?", [reservation.borrow_id]);
     for (const item of items) {
       await conn.query("UPDATE ASSET SET status = 'available' WHERE asset_id = ? AND status = 'reserved'", [item.asset_id]);
     }
+    await recordActivity(req, {
+      action: 'cancel', entityType: 'reservation', entityId: reservation.borrow_id,
+      summary: `ยกเลิกการจอง ${reservation.borrow_code}`,
+      before: { status: 'reserved', emp_id: reservation.emp_id, pickup_date: reservation.pickup_date, due_date: reservation.due_date, items },
+      after: { status: 'cancelled' },
+    }, conn);
     await conn.commit();
     res.json({ message: 'ยกเลิกการจองและคืนสถานะอุปกรณ์แล้ว' });
   } catch (err) {
@@ -252,6 +266,19 @@ router.put('/:id/decision', requireAuth, requireRole('approver', 'admin'), async
       return res.status(400).json({ message: 'decision ต้องเป็น approved หรือ rejected' });
     }
     await conn.beginTransaction();
+
+    const [[borrowBefore]] = await conn.query(
+      `SELECT borrow_id, borrow_code, status, emp_id, due_date, pickup_date, purpose FROM BORROW_REQUEST WHERE borrow_id=? FOR UPDATE`,
+      [req.params.id]
+    );
+    if (!borrowBefore || borrowBefore.status !== 'pending') {
+      await conn.rollback();
+      return res.status(404).json({ message: 'ไม่พบคำขอ หรือถูกดำเนินการไปแล้ว' });
+    }
+    const [borrowItems] = await conn.query(
+      `SELECT a.asset_id, a.asset_name, a.asset_code, a.status FROM BORROW_DETAIL bd JOIN ASSET a ON a.asset_id=bd.asset_id WHERE bd.borrow_id=?`,
+      [req.params.id]
+    );
 
     const [result] = await conn.query(
       `UPDATE BORROW_REQUEST SET status=?, approve_date=NOW(), note=?, approver_id=?
@@ -289,6 +316,13 @@ router.put('/:id/decision', requireAuth, requireRole('approver', 'admin'), async
       }
     }
 
+    await recordActivity(req, {
+      action: decision === 'approved' ? 'approve' : 'reject', entityType: 'borrow_request',
+      entityId: req.params.id,
+      summary: `${decision === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ'}คำขอ ${borrowBefore.borrow_code}`,
+      before: { status: borrowBefore.status, borrower_emp_id: borrowBefore.emp_id, due_date: borrowBefore.due_date, items: borrowItems },
+      after: { status: decision, note: note || null, items: borrowItems.map(({ status, ...item }) => ({ ...item, status: decision === 'approved' ? 'borrowed' : (borrowBefore.pickup_date ? 'available' : status) })) },
+    }, conn);
     await conn.commit();
     res.json({ message: decision === 'approved' ? 'อนุมัติคำขอสำเร็จ' : 'ปฏิเสธคำขอสำเร็จ' });
   } catch (err) {
